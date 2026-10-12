@@ -218,7 +218,8 @@ export class Overlay {
     top.append(el("div", "spacer"));
     this.tray = el("div", "tray");
     top.append(this.tray);
-    this.cams = el("div", "group");
+    const controls = el("div", "controls");
+    this.cams = el("div", "group cams");
     for (const c of CAMERA_MODES) {
       const b = el("button", "", `${c.key} ${c.label}`);
       b.dataset.mode = c.mode;
@@ -226,8 +227,8 @@ export class Overlay {
       b.addEventListener("click", () => actions.setCamera(c.mode));
       this.cams.append(b);
     }
-    top.append(this.cams);
-    this.speeds = el("div", "group");
+    controls.append(this.cams);
+    this.speeds = el("div", "group speeds");
     for (const s of SPEEDS) {
       const b = el("button", "", `${s}x`);
       b.dataset.speed = String(s);
@@ -235,7 +236,8 @@ export class Overlay {
       b.addEventListener("click", () => actions.setSpeed(s));
       this.speeds.append(b);
     }
-    top.append(this.speeds);
+    controls.append(this.speeds);
+    top.append(controls);
     this.conn = el("div", "conn disconnected", "disconnected");
     top.append(this.conn);
     root.append(top);
@@ -642,7 +644,8 @@ export class Overlay {
     const strip = el("div", "panel-tabs");
     const totalUnread = this.channelKeys(c).reduce((n, k) => n + store.unreadCount(c.id, k.key), 0);
     for (const t of PANEL_TABS) {
-      const b = el("button", `ptab${store.panelTab === t.tab ? " active" : ""}`, t.label);
+      const b = el("button", `ptab${store.panelTab === t.tab ? " active" : ""}`);
+      b.append(el("span", "ptab-label", t.label));
       if (t.tab === "chat" && totalUnread > 0) b.append(el("span", "unread", String(totalUnread)));
       b.addEventListener("click", () => this.setPanelTab(t.tab));
       strip.append(b);
@@ -669,8 +672,8 @@ export class Overlay {
     const tokens = c.spend.inputTokens + c.spend.outputTokens;
     const tokPct = tokens / Math.max(1, c.budget.maxTokens);
     const bar = (label: string, pct: number, right: string) => {
-      const row = el("div", "row");
-      row.append(el("span", "", label), el("span", "muted", right));
+      const row = el("div", "row spend-row");
+      row.append(el("span", "", label), el("span", "muted num", right));
       panel.append(row);
       const b = el("div", `bar${pct >= 1 ? " over" : pct >= 0.8 ? " warn" : ""}`);
       const fill = el("div");
@@ -680,8 +683,8 @@ export class Overlay {
     };
     bar("Turns", turnsPct, `${c.spend.turns} / ${c.budget.maxTurns}`);
     bar("Tokens", tokPct, `${fmtTokens(tokens)} / ${fmtTokens(c.budget.maxTokens)}`);
-    const usd = el("div", "row");
-    usd.append(el("span", "muted", "Estimated cost"), el("span", "", `$${c.spend.estimatedUsd.toFixed(2)}`));
+    const usd = el("div", "row spend-row");
+    usd.append(el("span", "muted", "Estimated cost"), el("span", "num", `${c.spend.estimatedUsd.toFixed(2)}`));
     panel.append(usd);
 
     // Founder inbox: the CEO's messages to the founder and the founder's replies.
@@ -706,18 +709,20 @@ export class Overlay {
     const list = store.agentsOf(c.id);
     if (list.length === 0) agents.append(el("div", "empty", "Nobody here yet."));
     for (const a of list) {
-      const row = el("div", `agent${a.id === store.selectedAgentId ? " selected" : ""}`);
+      const row = el("div", `agent${a.id === store.selectedAgentId ? " selected" : ""}${a.kind === "contractor" ? " contractor" : ""}`);
       row.append(el("span", `status-dot ${a.status}`));
-      const mid = el("div");
+      const mid = el("div", "agent-text");
       mid.append(el("div", "name", a.name));
+      const line = store.agentLines.get(a.id) ?? `${ROLE_LABEL[a.role]} · ${a.status}${a.currentTaskId ? ` · ${store.tasks.get(a.currentTaskId)?.title ?? ""}` : ""}`;
+      const lineEl = el("div", "line", line);
+      lineEl.title = line;
+      mid.append(lineEl);
       const styleLine = firstLine(a.style);
       if (styleLine) {
         const s = el("div", "line style", styleLine);
         s.title = a.style;
         mid.append(s);
       }
-      const line = store.agentLines.get(a.id) ?? `${ROLE_LABEL[a.role]} · ${a.status}${a.currentTaskId ? ` · ${store.tasks.get(a.currentTaskId)?.title ?? ""}` : ""}`;
-      mid.append(el("div", "line", line));
       row.append(mid);
       const right = el("div", "agent-right");
       right.append(el("span", `badge ${a.model ?? "none"}`, a.model ? a.model.toUpperCase() : a.kind === "npc" ? "NPC" : "-"));

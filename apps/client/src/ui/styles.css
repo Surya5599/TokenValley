@@ -1,16 +1,35 @@
 :root {
   --bg: #0b0e14;
-  --panel: rgba(17, 21, 30, 0.88);
-  --panel-border: rgba(255, 255, 255, 0.08);
-  --text: #e6e8ee;
-  --muted: #8b93a7;
+  --panel: rgba(27, 28, 32, 0.94);
+  --panel-solid: #1b1c20;
+  --panel-border: rgba(255, 255, 255, 0.1);
+  --rule: rgba(255, 255, 255, 0.08);
+  --hover: rgba(255, 255, 255, 0.06);
+  --text: #e8e8ec;
+  --muted: #9a9ba3;
   --accent: #7cc4ff;
   --green: #2dc653;
   --yellow: #ffd60a;
   --orange: #ff8c00;
   --red: #e63946;
+  --blue: #4c8dff;
   --grey: #8d99ae;
+  --radius: 6px;
+  --pad: 10px;
+  --panel-w: 320px;
   --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+@media (min-width: 1280px) {
+  :root {
+    --panel-w: 360px;
+  }
+}
+
+@media (min-width: 1600px) {
+  :root {
+    --panel-w: 400px;
+  }
 }
 
 * {
@@ -25,7 +44,15 @@ body {
   color: var(--text);
   font-family: var(--font);
   font-size: 13px;
+  line-height: 1.4;
   overflow: hidden;
+}
+
+@media (min-width: 1280px) {
+  html,
+  body {
+    font-size: 14px;
+  }
 }
 
 #app {
@@ -50,14 +77,42 @@ body {
   pointer-events: auto;
 }
 
+/* Thin dark scrollbars everywhere in the overlay. */
+#overlay * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+#overlay *::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+#overlay *::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#overlay *::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+#overlay *::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+  background-clip: padding-box;
+}
+
 button {
   font: inherit;
   color: var(--text);
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--panel-border);
-  border-radius: 6px;
-  padding: 4px 9px;
+  border-radius: var(--radius);
+  padding: 5px 10px;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 button:hover {
@@ -77,11 +132,11 @@ button.active {
   top: 0;
   left: 0;
   right: 0;
-  height: 44px;
+  height: 48px;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 12px;
+  gap: 12px;
+  padding: 0 14px;
   background: var(--panel);
   border-bottom: 1px solid var(--panel-border);
   backdrop-filter: blur(6px);
@@ -89,14 +144,14 @@ button.active {
 
 .brand {
   font-weight: 700;
-  font-size: 15px;
+  font-size: 16px;
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
 
 .tabs {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   overflow-x: auto;
   flex: 0 1 auto;
   min-width: 0;
@@ -105,29 +160,31 @@ button.active {
 .tab {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  padding: 6px 12px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
 .dot {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background: var(--grey);
   flex: none;
 }
 
 .dot.working {
-  background: var(--accent);
+  background: var(--green);
 }
 .dot.blocked {
-  background: var(--orange);
+  background: var(--red);
 }
 .dot.waiting_on_founder {
   background: var(--yellow);
 }
 .dot.done {
-  background: var(--green);
+  background: var(--accent);
 }
 .dot.out_of_budget {
   background: var(--red);
@@ -142,7 +199,7 @@ button.active {
 
 .tray {
   display: flex;
-  gap: 6px;
+  gap: 8px;
 }
 
 .tray .pill {
@@ -150,23 +207,38 @@ button.active {
   border: 1px solid var(--yellow);
   color: var(--yellow);
   border-radius: 999px;
-  padding: 2px 10px;
+  padding: 3px 12px;
   font-weight: 600;
   white-space: nowrap;
 }
 
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.03);
+}
+
 .group {
   display: flex;
-  gap: 3px;
+  gap: 4px;
+}
+
+.group.speeds {
+  padding-left: 10px;
+  border-left: 1px solid var(--panel-border);
 }
 
 .group button {
-  padding: 3px 7px;
+  padding: 3px 8px;
 }
 
 .conn {
   border-radius: 999px;
-  padding: 2px 10px;
+  padding: 3px 12px;
   font-weight: 600;
   font-size: 12px;
   border: 1px solid transparent;
@@ -198,44 +270,57 @@ button.active {
 
 .panel {
   position: absolute;
-  top: 54px;
+  top: 58px;
   right: 10px;
-  width: 300px;
-  max-height: calc(100% - 64px);
+  width: var(--panel-w);
+  max-height: calc(100% - 68px);
   overflow-y: auto;
+  overflow-x: hidden;
   background: var(--panel);
   border: 1px solid var(--panel-border);
-  border-radius: 10px;
-  padding: 12px;
+  border-radius: 8px;
+  padding: var(--pad);
   backdrop-filter: blur(6px);
+}
+
+.panel > * {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .panel h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 17px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 .panel .tagline {
   color: var(--muted);
-  margin: 2px 0 6px;
+  margin: 2px 0 8px;
+  overflow-wrap: anywhere;
 }
 
 .panel .phase {
   display: inline-block;
   font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding: 2px 8px;
+  letter-spacing: 0.08em;
+  padding: 2px 9px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  margin-bottom: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  margin-bottom: 8px;
 }
 
 .panel h3 {
-  margin: 12px 0 6px;
+  margin: 16px 0 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule);
   font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   color: var(--muted);
 }
 
@@ -244,7 +329,7 @@ button.active {
   background: rgba(255, 255, 255, 0.08);
   border-radius: 999px;
   overflow: hidden;
-  margin: 3px 0 6px;
+  margin: 4px 0 8px;
 }
 
 .bar > div {
@@ -264,44 +349,77 @@ button.active {
 .row {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.row > * {
+  min-width: 0;
+}
+
+.spend-row .num {
+  flex: none;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .muted {
   color: var(--muted);
 }
 
+/* ---- agents list ---- */
+
 .agents {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  min-width: 0;
 }
 
 .agent {
   display: grid;
-  grid-template-columns: 10px 1fr auto;
-  gap: 8px;
-  align-items: center;
-  padding: 5px 7px;
-  border-radius: 6px;
+  grid-template-columns: 10px minmax(0, 1fr) 64px;
+  column-gap: 10px;
+  align-items: start;
+  padding: 8px 10px;
+  margin: 0 -10px;
+  border-bottom: 1px solid var(--rule);
+  border-left: 2px solid transparent;
   cursor: pointer;
-  border: 1px solid transparent;
+  min-width: 0;
+}
+
+.agent:last-child {
+  border-bottom: none;
 }
 
 .agent:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--hover);
 }
 
 .agent.selected {
-  border-color: var(--accent);
+  border-left-color: var(--accent);
+  background: rgba(124, 196, 255, 0.08);
 }
 
-.agent > div {
+.agent.contractor {
+  grid-template-columns: 26px minmax(0, 1fr) 64px;
+}
+
+.agent.contractor .status-dot {
+  margin-left: 16px;
+}
+
+.agent-text {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .agent .name {
   font-weight: 600;
+  line-height: 1.3;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -309,18 +427,46 @@ button.active {
 
 .agent .line {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 0.92em;
+  line-height: 1.35;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.agent .line.style {
+  color: #b9bcc8;
+  font-style: italic;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
+
+.agent-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  width: 64px;
+  flex: none;
+}
+
 .badge {
+  display: inline-block;
   font-size: 10px;
   font-weight: 700;
-  padding: 1px 6px;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
   border-radius: 4px;
   color: #fff;
+  white-space: nowrap;
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .badge.opus {
@@ -338,20 +484,22 @@ button.active {
 }
 
 .status-dot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
   border-radius: 50%;
   background: var(--grey);
+  flex: none;
 }
 
 .status-dot.working {
-  background: var(--accent);
+  background: var(--green);
 }
 .status-dot.talking {
   background: #c77dff;
 }
 .status-dot.meeting {
-  background: #ff9f1c;
+  background: var(--blue);
 }
 .status-dot.blocked {
   background: var(--red);
@@ -363,34 +511,55 @@ button.active {
   background: var(--grey);
 }
 
+button.icon {
+  padding: 1px 7px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--muted);
+  background: transparent;
+  flex: none;
+}
+
+button.icon:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ---- kanban ---- */
+
 .kanban {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 4px;
+  gap: 5px;
+  min-width: 0;
 }
 
 .col {
   min-width: 0;
   background: rgba(255, 255, 255, 0.04);
-  border-radius: 6px;
-  padding: 4px;
-  min-height: 48px;
+  border-radius: var(--radius);
+  padding: 5px;
+  min-height: 52px;
 }
 
 .col h4 {
-  margin: 0 0 4px;
+  margin: 0 0 5px;
   font-size: 9px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   color: var(--muted);
   text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .card {
   font-size: 10px;
+  line-height: 1.3;
   background: rgba(255, 255, 255, 0.08);
   border-radius: 4px;
-  padding: 3px 4px;
+  padding: 3px 5px;
   margin-bottom: 3px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -410,39 +579,48 @@ button.active {
   position: absolute;
   left: 10px;
   bottom: 10px;
-  width: 400px;
-  height: 200px;
+  width: 480px;
+  max-width: calc(100% - 20px);
+  height: 220px;
   display: flex;
   flex-direction: column;
+  font-size: 13px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
-  border-radius: 10px;
+  border-radius: 8px;
   backdrop-filter: blur(6px);
 }
 
 .feed .title {
-  padding: 6px 10px;
+  padding: 7px var(--pad);
   font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   color: var(--muted);
   border-bottom: 1px solid var(--panel-border);
 }
 
 .feed .list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 4px 0;
 }
 
 .entry {
-  display: flex;
-  gap: 8px;
-  padding: 2px 10px;
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: start;
+  padding: 3px var(--pad);
   cursor: default;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.entry.empty {
+  display: block;
 }
 
 .entry.clickable {
@@ -450,18 +628,23 @@ button.active {
 }
 
 .entry.clickable:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--hover);
 }
 
 .entry .time {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
-  flex: none;
+  white-space: nowrap;
 }
 
 .entry .text {
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
   text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .entry.alert .text {
@@ -475,13 +658,19 @@ button.active {
 
 .hint {
   position: absolute;
-  right: 10px;
+  left: 500px;
+  right: calc(var(--panel-w) + 20px);
   bottom: 10px;
+  width: max-content;
+  max-width: calc(100% - 520px - var(--panel-w));
+  margin-left: auto;
+  text-align: right;
+  line-height: 1.6;
   color: var(--muted);
   font-size: 11px;
   background: var(--panel);
   border: 1px solid var(--panel-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 6px 10px;
 }
 
@@ -569,24 +758,26 @@ body.firstperson .fp-hint {
 
 .modal {
   width: 520px;
+  max-width: calc(100% - 20px);
   max-height: calc(100% - 40px);
   overflow-y: auto;
-  background: #141822;
+  background: var(--panel-solid);
   border: 1px solid var(--panel-border);
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 16px 18px;
 }
 
 .modal h2 {
   margin: 0 0 10px;
-  font-size: 16px;
+  font-size: 17px;
 }
 
 .modal label {
   display: block;
   font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: var(--muted);
   margin: 10px 0 4px;
 }
@@ -599,7 +790,7 @@ body.firstperson .fp-hint {
   color: var(--text);
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--panel-border);
-  border-radius: 6px;
+  border-radius: var(--radius);
   padding: 6px 8px;
 }
 
@@ -659,7 +850,7 @@ button:disabled {
 .badge.live {
   background: var(--green);
   color: #06250f;
-  margin-left: 6px;
+  margin-left: 8px;
   vertical-align: middle;
 }
 
@@ -691,7 +882,7 @@ button:disabled {
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.05);
   border-left: 3px solid var(--yellow);
-  border-radius: 6px;
+  border-radius: var(--radius);
   white-space: pre-wrap;
   line-height: 1.4;
 }
@@ -726,27 +917,35 @@ button.danger {
   color: #ff8d96;
 }
 
-/* ---- founder inbox ---- */
+/* ---- founder inbox (From the CEO) ---- */
 
 .inbox {
-  max-height: 120px;
+  max-height: 180px;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding-right: 2px;
+  gap: 6px;
+  padding-right: 4px;
+  min-width: 0;
 }
 
 .inbox .msg {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  padding: 5px 8px;
-  border-radius: 8px;
+  gap: 2px;
+  padding: 7px 10px;
+  border-radius: var(--radius);
   background: rgba(255, 255, 255, 0.06);
   border-left: 3px solid var(--accent);
-  font-size: 12px;
-  line-height: 1.35;
+  line-height: 1.4;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.inbox .msg .text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .inbox .msg.mine {
@@ -758,57 +957,68 @@ button.danger {
 
 .inbox .who {
   font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: var(--muted);
 }
 
 .compose {
   display: flex;
-  gap: 6px;
-  margin-top: 6px;
+  gap: 8px;
+  margin-top: 8px;
+  width: 100%;
+  min-width: 0;
 }
 
 .compose input {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
+  width: 100%;
   font: inherit;
   color: var(--text);
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--panel-border);
-  border-radius: 6px;
-  padding: 5px 8px;
+  border-radius: var(--radius);
+  padding: 6px 10px;
+}
+
+.compose button {
+  flex: none;
 }
 
 /* ---- panel tabs (Company | Chat) ---- */
 
 .panel-tabs {
   display: flex;
-  gap: 4px;
-  margin: -2px 0 10px;
-  padding-bottom: 8px;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding-bottom: 10px;
   border-bottom: 1px solid var(--panel-border);
 }
 
 .panel-tabs .ptab {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
+  gap: 8px;
+  padding: 4px 12px;
   border-radius: 999px;
 }
 
 .unread {
-  display: inline-block;
-  min-width: 16px;
-  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
   border-radius: 999px;
   background: var(--accent);
   color: #0b0e14;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
-  line-height: 16px;
-  text-align: center;
+  line-height: 1;
+  flex: none;
 }
 
 .ptab.active .unread {
@@ -819,8 +1029,8 @@ button.danger {
 /* ---- chat view ---- */
 
 .panel.chat {
-  width: 420px;
-  height: calc(100% - 64px);
+  width: var(--panel-w);
+  height: calc(100% - 68px);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -835,47 +1045,52 @@ button.danger {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   white-space: nowrap;
   overflow: hidden;
+  min-width: 0;
 }
 
 .chat-company {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 15px;
+  flex: none;
 }
 
 .chat-channel {
   color: var(--muted);
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .chat-body {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   display: flex;
-  gap: 8px;
+  gap: 10px;
 }
 
 .chat-channels {
   flex: none;
-  width: 124px;
+  width: 120px;
   overflow-y: auto;
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding-right: 4px;
+  padding-right: 6px;
   border-right: 1px solid var(--panel-border);
 }
 
 .chat-section {
   font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   color: var(--muted);
-  margin: 6px 0 2px;
+  margin: 8px 0 3px;
 }
 
 .chat-section:first-child {
@@ -886,9 +1101,10 @@ button.danger {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 4px;
+  gap: 6px;
   width: 100%;
-  padding: 4px 6px;
+  min-width: 0;
+  padding: 5px 7px;
   text-align: left;
   background: transparent;
   border-color: transparent;
@@ -904,6 +1120,7 @@ button.danger {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .chan-label {
@@ -936,8 +1153,10 @@ button.danger {
 .chat-msgs {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   overflow-y: auto;
-  padding-right: 4px;
+  overflow-x: hidden;
+  padding-right: 6px;
 }
 
 .chat-main .compose {
@@ -946,22 +1165,23 @@ button.danger {
 
 .cmsg {
   display: grid;
-  grid-template-columns: 18px 1fr;
+  grid-template-columns: 18px minmax(0, 1fr);
   grid-template-rows: auto auto;
-  column-gap: 6px;
-  margin-top: 8px;
+  column-gap: 8px;
+  margin-top: 10px;
+  min-width: 0;
 }
 
 .cmsg.cont {
   grid-template-rows: auto;
-  margin-top: 1px;
+  margin-top: 2px;
 }
 
 .cmsg .avatar {
   grid-row: 1 / span 2;
   width: 14px;
   height: 14px;
-  margin-top: 2px;
+  margin-top: 3px;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.25);
 }
@@ -979,10 +1199,12 @@ button.danger {
   background: none;
   border: none;
   font-weight: 700;
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex: 0 1 auto;
+  min-width: 48px;
 }
 
 .cmsg-head .author:hover:not(:disabled) {
@@ -996,14 +1218,15 @@ button.danger {
 
 .cmsg-head .role {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .cmsg .time {
   color: var(--muted);
-  font-size: 10px;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
   flex: none;
 }
@@ -1013,7 +1236,7 @@ button.danger {
   visibility: hidden;
   font-size: 9px;
   align-self: start;
-  margin-top: 3px;
+  margin-top: 4px;
 }
 
 .cmsg.cont:hover .time.hover {
@@ -1022,8 +1245,8 @@ button.danger {
 
 .cmsg-text {
   grid-column: 2;
-  font-size: 12px;
-  line-height: 1.4;
+  min-width: 0;
+  line-height: 1.45;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -1032,31 +1255,7 @@ button.danger {
   color: #c8f5d4;
 }
 
-/* ---- agents list: persona edit ---- */
-
-.agent .line.style {
-  color: #b9c0d4;
-  font-style: italic;
-}
-
-.agent-right {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-button.icon {
-  padding: 1px 5px;
-  font-size: 11px;
-  line-height: 1.2;
-  color: var(--muted);
-  background: transparent;
-}
-
-button.icon:hover {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.12);
-}
+/* ---- persona editor ---- */
 
 .modal.persona {
   width: 480px;
@@ -1073,5 +1272,5 @@ button.icon:hover {
   padding: 8px 10px;
   background: rgba(255, 255, 255, 0.05);
   border-left: 3px solid var(--grey);
-  border-radius: 6px;
+  border-radius: var(--radius);
 }
