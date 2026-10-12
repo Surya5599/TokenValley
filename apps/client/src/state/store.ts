@@ -4,7 +4,7 @@ import type { ConnStatus } from "../net/ws";
 /** Derived building status shown on the valley map. */
 export type CompanyStatus = "working" | "blocked" | "waiting_on_founder" | "done" | "out_of_budget" | "paused";
 
-export type CameraMode = "valley" | "office" | "follow" | "meeting";
+export type CameraMode = "valley" | "office" | "follow" | "meeting" | "firstperson";
 
 const FEED_LIMIT = 50;
 
@@ -24,8 +24,6 @@ export class Store {
   readonly agentLines = new Map<string, string>();
   /** Active meetings: meetingId -> attendee ids. */
   readonly meetings = new Map<string, string[]>();
-  /** Wall-clock ms of the last build failure per company (incident sign). */
-  readonly incidentResetAt = new Map<string, number>();
 
   focusedCompanyId: string | null = null;
   selectedAgentId: string | null = null;
@@ -100,8 +98,6 @@ export class Store {
       this.pushEvent(e);
       this.reduce(e);
     }
-    const now = Date.now();
-    for (const c of this.companies.values()) if (!this.incidentResetAt.has(c.id)) this.incidentResetAt.set(c.id, now);
     const focus = msg.town.focusedCompanyId ?? this.companyList()[0]?.id ?? null;
     if (focus && this.companies.has(focus)) this.focusedCompanyId = focus;
     else if (!this.focusedCompanyId || !this.companies.has(this.focusedCompanyId)) this.focusedCompanyId = this.companyList()[0]?.id ?? null;
@@ -140,7 +136,6 @@ export class Store {
     switch (e.type) {
       case "company_founded":
         this.companies.set(e.company.id, e.company);
-        if (!this.incidentResetAt.has(e.company.id)) this.incidentResetAt.set(e.company.id, Date.now());
         break;
       case "company_phase":
         if (company) company.phase = e.phase;
@@ -224,8 +219,6 @@ export class Store {
         break;
       }
       case "build_failed":
-        this.incidentResetAt.set(e.companyId, Date.now());
-        break;
       case "build_passed":
         break;
       case "budget_warning":
