@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { HOME_SPOTS, ROLE_HOME, type Agent, type AgentStatus, type AnimState, type Event, type RoleId } from "@tokenvalley/shared";
-import type { Store } from "../state/store";
+import { FOUNDER_ID, type Store } from "../state/store";
 import { Character } from "./character";
 import { Office, spotTile, type Tile } from "./office";
 import { isWalkable, nearestWalkable, tileDistance } from "./pathfinding";
@@ -243,6 +243,34 @@ export class Director {
         break;
       }
       case "send_message": {
+        // The founder has no character: founder messages play out on the CEO.
+        if (e.agentId === FOUNDER_ID) {
+          const ceo = this.characters.get(e.toAgentId) ?? this.byRole("ceo");
+          if (ceo) {
+            ceo.say(`Founder: ${e.message.text}`, 5);
+            if (!ceo.isMoving) {
+              const prev = this.currentState(ceo);
+              ceo.setState("talk");
+              this.later(3, () => {
+                if (!ceo.isMoving && ceo.state === "talk") ceo.setState(prev === "talk" ? "idle" : prev);
+              });
+            }
+          }
+          break;
+        }
+        if (e.toAgentId === FOUNDER_ID) {
+          // Reporting to the founder: walk to the lobby bell, say it, walk back.
+          const ceo = this.characters.get(e.agentId) ?? this.byRole("ceo");
+          if (!ceo) break;
+          ceo.say(e.message.text, 4);
+          const home = this.homeSpotId(ceo.agent);
+          void ceo.goTo(office.bellSpot, "talk", office.faceTiles.get("bell") ?? null).then((ok) => {
+            if (!ok) return;
+            ceo.say(e.message.text, 5);
+            this.later(4, () => void ceo.goTo(home, this.currentState(ceo)));
+          });
+          break;
+        }
         const sender = this.characters.get(e.agentId);
         const recipient = this.characters.get(e.toAgentId);
         if (!sender) break;
@@ -369,7 +397,7 @@ export class Director {
       case "request_approval": {
         const ceo = this.characters.get(e.agentId) ?? this.byRole("ceo");
         if (!ceo) break;
-        ceo.say("Founder, a moment?", 2);
+        ceo.say(`Founder, a ${e.approval.kind} approval?`, 2);
         void ceo.goTo(office.bellSpot, "idle", office.faceTiles.get("bell") ?? null).then((ok) => {
           if (!ok) return;
           office.ringBell();

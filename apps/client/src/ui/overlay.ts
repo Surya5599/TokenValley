@@ -1,5 +1,5 @@
 import { FoundCompanyInput, ROLE_LABEL, type Event, type ModelTier, type RoleId, type TaskStatus } from "@tokenvalley/shared";
-import type { CameraMode, Store } from "../state/store";
+import { FOUNDER_ID, type CameraMode, type Store } from "../state/store";
 
 export interface OverlayActions {
   focusCompany: (companyId: string) => void;
@@ -7,7 +7,11 @@ export interface OverlayActions {
   setCamera: (mode: CameraMode) => void;
   setSpeed: (speed: number) => void;
   foundCompany: (input: FoundCompanyInput) => void;
+  resolveApproval: (approvalId: string, status: "approved" | "rejected", comment: string | null) => void;
+  sendFounderMessage: (companyId: string, text: string) => void;
 }
+
+const INBOX_LIMIT = 8;
 
 const CAMERA_MODES: { mode: CameraMode; label: string; key: string }[] = [
   { mode: "valley", label: "Valley", key: "1" },
@@ -57,7 +61,7 @@ function base(path: string): string {
 
 /** One-line description of an event for the activity feed. */
 export function describeEvent(e: Event, store: Store): { text: string; tone: "normal" | "alert" | "good" } {
-  const name = (id: string) => store.agents.get(id)?.name ?? id;
+  const name = (id: string) => (id === FOUNDER_ID ? "Founder" : (store.agents.get(id)?.name ?? id));
   const task = (id: string) => store.tasks.get(id)?.title ?? id;
   switch (e.type) {
     case "company_founded":
@@ -133,6 +137,11 @@ export class Overlay {
   private readonly modalBackdrop: HTMLElement;
   private readonly modalError: HTMLElement;
   private readonly modalForm: HTMLFormElement;
+  private readonly approvalBackdrop: HTMLElement;
+  private readonly approvalBody: HTMLElement;
+  private readonly approvalComment: HTMLTextAreaElement;
+  private approvalOpenId: string | null = null;
+  private inboxDraft = "";
   private scheduled = false;
   private lastFeedKey = "";
 
@@ -206,8 +215,72 @@ export class Overlay {
     });
     root.append(this.modalBackdrop);
 
+    // Approval modal.
+    this.approvalBackdrop = el("div", "modal-backdrop");
+    const amodal = el("div", "modal approval");
+    this.approvalBody = el("div");
+    amodal.append(this.approvalBody);
+    amodal.append(el("label", "", "Comment (optional)"));
+    this.approvalComment = el("textarea");
+    this.approvalComment.placeholder = "Notes for the CEO";
+    amodal.append(this.approvalComment);
+    const aactions = el("div", "actions");
+    const later = el("button", "", "Later");
+    later.type = "button";
+    later.addEventListener("click", () => this.closeApproval());
+    const reject = el("button", "danger", "Reject");
+    reject.type = "button";
+    reject.addEventListener("click", () => this.submitApproval("rejected"));
+    const approve = el("button", "primary", "Approve");
+    approve.type = "button";
+    approve.addEventListener("click", () => this.submitApproval("approved"));
+    aactions.append(later, reject, approve);
+    amodal.append(aactions);
+    this.approvalBackdrop.append(amodal);
+    this.approvalBackdrop.addEventListener("click", (e) => {
+      if (e.target === this.approvalBackdrop) this.closeApproval();
+    });
+    root.append(this.approvalBackdrop);
+
     store.onChange(() => this.schedule());
     this.render();
+  }
+
+  // ---- approval modal ------------------------------------------------------------
+
+  isApprovalOpen(): boolean {
+    return this.approvalOpenId !== null;
+  }
+
+  /** Shows the approval dialog for a pending approval id. */
+  openApproval(approvalId: string): void {
+    const a = this.store.approvals.get(approvalId);
+    if (!a || a.status !== "pending") return;
+    const company = this.store.companies.get(a.companyId);
+    this.approvalOpenId = approvalId;
+    this.approvalBody.replaceChildren();
+    const head = el("h2", "", company?.name ?? a.companyId);
+    head.append(el("span", `kind-badge ${a.kind}`, a.kind));
+    this.approvalBody.append(head);
+    this.approvalBody.append(el("div", "tagline", "The CEO is waiting at the lobby bell."));
+    this.approvalBody.append(el("div", "summary", a.summary));
+    this.approvalComment.value = "";
+    this.approvalBackdrop.classList.add("open");
+  }
+
+  /** Closes the dialog; with an id, only if that approval is the one shown. */
+  closeApproval(approvalId?: string): void {
+    if (approvalId !== undefined && this.approvalOpenId !== approvalId) return;
+    this.approvalOpenId = null;
+    this.approvalBackdrop.classList.remove("open");
+  }
+
+  private submitApproval(status: "approved" | "rejected"): void {
+    const id = this.approvalOpenId;
+    if (!id) return;
+    const comment = this.approvalComment.value.trim();
+    this.actions.resolveApproval(id, status, comment.length > 0 ? comment : null);
+    this.closeApproval();
   }
 
   // ---- found-company modal ------------------------------------------------------
@@ -358,8 +431,12 @@ export class Overlay {
     this.tray.replaceChildren();
     for (const c of store.companyList()) {
       if (store.statusOf(c.id) !== "waiting_on_founder") continue;
-      const pill = el("button", "pill", `${c.name} needs you`);
-      pill.addEventListener("click", () => this.actions.focusCompany(c.id));
+      const pending = store.pendingApprovalFor(c.id);
+      const pill = el("button", "pill pulse", `${c.name} needs you`);
+      pill.addEventListener("click", () => {
+        this.actions.focusCompany(c.id);
+        if (pending) this.openApproval(pending.id);
+      });
       this.tray.append(pill);
     }
     this.foundButton.disabled = store.demo;
@@ -415,6 +492,43 @@ export class Overlay {
     const usd = el("div", "row");
     usd.append(el("span", "muted", "Estimated cost"), el("span", "", `$${c.spend.estimatedUsd.toFixed(2)}`));
     panel.append(usd);
+
+    // Founder inbox: the CEO's messages to the founder and the founder's replies.
+    panel.append(el("h3", "", "From the CEO"));
+    const inbox = el("div", "inbox");
+    const thread = store.founderThreadOf(c.id).slice(-INBOX_LIMIT);
+    if (thread.length === 0) inbox.append(el("div", "empty", "No messages yet."));
+    for (const m of thread) {
+      const mine = m.from === FOUNDER_ID;
+      const row = el("div", `msg${mine ? " mine" : ""}`);
+      row.append(el("span", "who", mine ? "You" : (store.agents.get(m.from)?.name ?? "CEO")), el("span", "text", m.text));
+      row.title = fmtTime(m.timestamp);
+      inbox.append(row);
+    }
+    panel.append(inbox);
+    inbox.scrollTop = inbox.scrollHeight;
+    const compose = el("form", "compose");
+    const input = el("input");
+    input.type = "text";
+    input.placeholder = store.demo ? "Disabled in demo mode" : "Message the CEO";
+    input.value = this.inboxDraft;
+    input.maxLength = 2000;
+    const canSend = !store.demo && store.connection === "connected";
+    input.disabled = !canSend;
+    input.addEventListener("input", () => (this.inboxDraft = input.value));
+    const send = el("button", "primary", "Send");
+    send.type = "submit";
+    send.disabled = !canSend;
+    compose.append(input, send);
+    compose.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text || !canSend) return;
+      this.actions.sendFounderMessage(c.id, text);
+      this.inboxDraft = "";
+      input.value = "";
+    });
+    panel.append(compose);
 
     // Agents.
     panel.append(el("h3", "", "Agents"));

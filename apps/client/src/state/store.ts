@@ -7,6 +7,18 @@ export type CompanyStatus = "working" | "blocked" | "waiting_on_founder" | "done
 export type CameraMode = "valley" | "office" | "follow" | "meeting" | "firstperson";
 
 const FEED_LIMIT = 50;
+const FOUNDER_THREAD_LIMIT = 20;
+
+/** The founder is not an agent; this id marks messages to/from them. */
+export const FOUNDER_ID = "founder";
+
+export interface FounderMessage {
+  id: string;
+  /** "founder" when the founder wrote it, otherwise the sending agent's id (the CEO). */
+  from: string;
+  text: string;
+  timestamp: number;
+}
 
 /**
  * All client state. The director and overlay read from here; only
@@ -24,6 +36,8 @@ export class Store {
   readonly agentLines = new Map<string, string>();
   /** Active meetings: meetingId -> attendee ids. */
   readonly meetings = new Map<string, string[]>();
+  /** Founder <-> CEO thread per company (last FOUNDER_THREAD_LIMIT), oldest first. */
+  readonly founderThreads = new Map<string, FounderMessage[]>();
 
   focusedCompanyId: string | null = null;
   selectedAgentId: string | null = null;
@@ -66,6 +80,10 @@ export class Store {
     return null;
   }
 
+  founderThreadOf(companyId: string): FounderMessage[] {
+    return this.founderThreads.get(companyId) ?? [];
+  }
+
   focusedCompany(): Company | null {
     return this.focusedCompanyId ? (this.companies.get(this.focusedCompanyId) ?? null) : null;
   }
@@ -91,6 +109,7 @@ export class Store {
     this.events.clear();
     this.approvals.clear();
     this.meetings.clear();
+    this.founderThreads.clear();
     for (const c of msg.companies) this.companies.set(c.id, c);
     for (const a of msg.agents) this.agents.set(a.id, a);
     for (const t of msg.tasks) this.tasks.set(t.id, t);
@@ -191,6 +210,15 @@ export class Store {
         break;
       }
       case "send_message":
+        if (e.agentId === FOUNDER_ID || e.toAgentId === FOUNDER_ID) {
+          let thread = this.founderThreads.get(e.companyId);
+          if (!thread) {
+            thread = [];
+            this.founderThreads.set(e.companyId, thread);
+          }
+          thread.push({ id: e.message.id, from: e.agentId, text: e.message.text, timestamp: e.timestamp });
+          if (thread.length > FOUNDER_THREAD_LIMIT) thread.splice(0, thread.length - FOUNDER_THREAD_LIMIT);
+        }
         break;
       case "handoff": {
         const t = this.tasks.get(e.taskId);

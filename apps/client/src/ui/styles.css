@@ -662,3 +662,113 @@ button:disabled {
   word-break: break-all;
   margin-bottom: 6px;
 }
+
+/* ---- approvals ---- */
+
+@keyframes tray-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 214, 10, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(255, 214, 10, 0);
+  }
+}
+
+.tray .pill.pulse {
+  animation: tray-pulse 1.6s ease-out infinite;
+}
+
+.modal.approval .summary {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-left: 3px solid var(--yellow);
+  border-radius: 6px;
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+.kind-badge {
+  display: inline-block;
+  margin-left: 10px;
+  vertical-align: middle;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #0b0e14;
+  background: var(--accent);
+}
+
+.kind-badge.plan {
+  background: #7cc4ff;
+}
+.kind-badge.build {
+  background: #ffb703;
+}
+.kind-badge.ship {
+  background: #2dc653;
+}
+
+button.danger {
+  background: rgba(230, 57, 70, 0.2);
+  border-color: var(--red);
+  color: #ff8d96;
+}
+
+/* ---- founder inbox ---- */
+
+.inbox {
+  max-height: 120px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 2px;
+}
+
+.inbox .msg {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border-left: 3px solid var(--accent);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.inbox .msg.mine {
+  background: rgba(45, 198, 83, 0.12);
+  border-left-color: var(--green);
+  align-self: flex-end;
+  max-width: 92%;
+}
+
+.inbox .who {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.compose {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.compose input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 5px 8px;
+}

@@ -104,7 +104,8 @@ function buildScript(): EventFactory[] {
   const base = (companyId: string) => ({ id: nextId("evt"), companyId, timestamp: Date.now() });
   const intern = agent("pf-intern", A, "intern", "Sam (Intern)");
   const contractor: Agent = { ...agent("pf-helper", A, "engineer", "helper"), kind: "contractor", model: "haiku", parentAgentId: pf.eng.id };
-  const approval = { id: "pf-ap1", companyId: A, summary: "Plan: ship landing page v1 by Friday", status: "pending" as const, founderComment: null };
+  const approval = { id: "pf-ap1", companyId: A, kind: "ship" as const, summary: "Ship landing page v1: nav fix, design tokens, smoke tests green. Merge to main?", status: "pending" as const, founderComment: null };
+  const FOUNDER = "founder";
   const spendWarn = { turns: 165, inputTokens: 1_500_000, outputTokens: 310_000, estimatedUsd: 14.8 };
   const budgetA = { maxTurns: 200, maxTokens: 2_000_000 };
   let founded = false;
@@ -143,6 +144,20 @@ function buildScript(): EventFactory[] {
     () => ({ ...base(A), type: "tool_write_file", agentId: pf.eng.id, path: "src/components/Nav.tsx" }),
     () => ({ ...base(A), type: "build_passed", summary: "all green" }),
     () => ({ ...base(A), type: "task_done", agentId: pf.eng.id, taskId: "pf-t5" }),
+    () => ({
+      ...base(A),
+      type: "send_message",
+      agentId: FOUNDER,
+      toAgentId: pf.ceo.id,
+      message: { id: nextId("msg"), companyId: A, from: FOUNDER, to: pf.ceo.id, text: "How close are we to shipping?", taskId: null, timestamp: Date.now() },
+    }),
+    () => ({
+      ...base(A),
+      type: "send_message",
+      agentId: pf.ceo.id,
+      toAgentId: FOUNDER,
+      message: { id: nextId("msg"), companyId: A, from: pf.ceo.id, to: FOUNDER, text: "Leveraging synergies: nav fix is done, build is green. Ready for your sign-off.", taskId: null, timestamp: Date.now() },
+    }),
     () => ({ ...base(A), type: "request_approval", agentId: pf.ceo.id, approval: { ...approval, status: "pending" } }),
     () => ({ ...base(B), type: "budget_warning", spend: { turns: 170, inputTokens: 1_700_000, outputTokens: 200_000, estimatedUsd: 16.1 }, budget: budgetA }),
     () => ({ ...base(A), type: "approval_resolved", approval: { ...approval, status: "approved", founderComment: "Ship it." } }),

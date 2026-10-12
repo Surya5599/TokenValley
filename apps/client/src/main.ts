@@ -189,7 +189,29 @@ function bootstrap(): void {
     foundCompany: (input: FoundCompanyInput) => {
       if (!ws || !ws.send({ kind: "found_company", input })) overlay.showFoundError("Not connected to the server.");
     },
+    resolveApproval: (approvalId, status, comment) => {
+      const approval = store.approvals.get(approvalId);
+      if (ws) {
+        ws.send({ kind: "resolve_approval", approvalId, status, comment });
+      } else if (approval) {
+        // Demo: resolve locally so the office reacts.
+        handleMessage({
+          kind: "event",
+          event: { id: `local-${Date.now()}`, companyId: approval.companyId, timestamp: Date.now(), type: "approval_resolved", approval: { ...approval, status, founderComment: comment } },
+        });
+      }
+    },
+    sendFounderMessage: (companyId, text) => {
+      ws?.send({ kind: "founder_message", companyId, text });
+    },
   });
+
+  /** Opens the approval dialog if the focused company has one pending. */
+  const surfacePendingApproval = () => {
+    const id = store.focusedCompanyId;
+    const pending = id ? store.pendingApprovalFor(id) : null;
+    if (pending && !overlay.isApprovalOpen()) overlay.openApproval(pending.id);
+  };
 
   // ---- messages ----
   const handleMessage = (m: ServerMessage) => {
@@ -200,6 +222,7 @@ function bootstrap(): void {
         valley.sync(store);
         rig.meetingCenter.copy(director.meetingCenter());
         applyVisibility();
+        surfacePendingApproval();
         break;
       case "event":
         store.applyEvent(m.event);
@@ -207,6 +230,8 @@ function bootstrap(): void {
         director.handle(m.event);
         valley.sync(store);
         applyVisibility();
+        if (m.event.type === "request_approval" && m.event.companyId === store.focusedCompanyId) overlay.openApproval(m.event.approval.id);
+        if (m.event.type === "approval_resolved") overlay.closeApproval(m.event.approval.id);
         break;
       case "focus_changed":
         focusCompany(m.companyId, false);
@@ -268,6 +293,7 @@ function bootstrap(): void {
         break;
       case "Escape":
         if (overlay.isModalOpen()) overlay.closeFoundModal();
+        else if (overlay.isApprovalOpen()) overlay.closeApproval();
         else if (store.cameraMode === "firstperson") setCamera(fpContext === "valley" ? "valley" : "office");
         else setCamera(store.focusedCompanyId ? "office" : "valley");
         break;
@@ -295,7 +321,7 @@ function bootstrap(): void {
   requestAnimationFrame(tick);
 
   // Debug hook for driving the client from the console or scripts.
-  (window as unknown as { tokenvalley: unknown }).tokenvalley = { store, rig, director, valley, setCamera, focusCompany };
+  (window as unknown as { tokenvalley: unknown }).tokenvalley = { store, rig, director, valley, overlay, setCamera, focusCompany, handleMessage };
 }
 
 bootstrap();
