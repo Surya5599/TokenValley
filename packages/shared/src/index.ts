@@ -107,6 +107,10 @@ export const Company = z.object({
   name: z.string(),
   tagline: z.string().default(""),
   brief: z.string(),
+  /** Folder this company is in charge of. Empty for fake companies. */
+  workspacePath: z.string().default(""),
+  /** True when real Claude Code agents run this company. */
+  live: z.boolean().default(false),
   rosterTemplate: z.string(),
   palette: Palette,
   budget: Budget,
@@ -238,12 +242,28 @@ export const ServerMessage = z.discriminatedUnion("kind", [
   }),
   z.object({ kind: z.literal("event"), event: Event }),
   z.object({ kind: z.literal("focus_changed"), companyId: z.string() }),
+  z.object({ kind: z.literal("error"), message: z.string() }),
+  z.object({ kind: z.literal("founded"), companyId: z.string() }),
 ]);
 export type ServerMessage = z.infer<typeof ServerMessage>;
 
 /** Client -> server. */
+export const FoundCompanyInput = z.object({
+  name: z.string().min(1).max(60),
+  tagline: z.string().max(120).default(""),
+  brief: z.string().min(1).max(4000),
+  /** Absolute path to the folder (or git checkout) this company is in charge of. */
+  workspacePath: z.string().min(1),
+  rosterTemplate: z.string().default("startup"),
+  modelOverrides: z.record(ModelTier).default({}),
+  maxTurns: z.number().int().positive().default(100),
+  maxTokens: z.number().int().positive().default(1_000_000),
+});
+export type FoundCompanyInput = z.infer<typeof FoundCompanyInput>;
+
 export const ClientMessage = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("hello") }),
+  z.object({ kind: z.literal("found_company"), input: FoundCompanyInput }),
   z.object({ kind: z.literal("focus_company"), companyId: z.string() }),
   z.object({ kind: z.literal("set_agent_model"), agentId: z.string(), model: ModelTier }),
   z.object({ kind: z.literal("resolve_approval"), approvalId: z.string(), status: ApprovalStatus, comment: z.string().nullable() }),
@@ -260,26 +280,67 @@ export type ClientMessage = z.infer<typeof ClientMessage>;
 export const OFFICE_WIDTH = 40;
 export const OFFICE_DEPTH = 30;
 
+/**
+ * Office layout, modelled on the Scranton paper-company floor plan: entrance
+ * and reception on the left, manager office and conference room along the
+ * back wall, kitchen, an open bullpen of desk clusters in the middle,
+ * accounting in the front-left corner, and an annex with the break room and
+ * vending machines on the far right. x runs left to right, z runs back (0)
+ * to front (OFFICE_DEPTH - 1).
+ */
+export type Room = {
+  id: string;
+  label: string;
+  /** Tile bounds, inclusive. */
+  x0: number; z0: number; x1: number; z1: number;
+  /** Door tiles on the room boundary that stay walkable. */
+  doors: { x: number; z: number }[];
+};
+
+export const OFFICE_ROOMS: Room[] = [
+  { id: "ceo_office", label: "Manager", x0: 1, z0: 1, x1: 9, z1: 8, doors: [{ x: 9, z: 6 }, { x: 6, z: 8 }] },
+  { id: "meeting_room", label: "Conference Room", x0: 10, z0: 1, x1: 19, z1: 8, doors: [{ x: 14, z: 8 }] },
+  { id: "kitchen", label: "Kitchen", x0: 20, z0: 1, x1: 25, z1: 8, doors: [{ x: 22, z: 8 }] },
+  { id: "hallway", label: "Back Hall", x0: 26, z0: 1, x1: 30, z1: 8, doors: [{ x: 28, z: 8 }, { x: 30, z: 4 }] },
+  { id: "break_room", label: "Break Room", x0: 31, z0: 1, x1: 38, z1: 8, doors: [{ x: 31, z: 4 }, { x: 34, z: 8 }] },
+  { id: "annex", label: "Annex", x0: 31, z0: 9, x1: 38, z1: 20, doors: [{ x: 31, z: 14 }, { x: 34, z: 9 }] },
+  { id: "server_closet", label: "IT Closet", x0: 31, z0: 21, x1: 38, z1: 28, doors: [{ x: 31, z: 24 }] },
+  { id: "restrooms", label: "Restrooms", x0: 26, z0: 20, x1: 30, z1: 28, doors: [{ x: 26, z: 23 }] },
+  { id: "accounting", label: "Accounting", x0: 1, z0: 20, x1: 12, z1: 28, doors: [{ x: 12, z: 24 }, { x: 8, z: 20 }] },
+  { id: "lobby", label: "Reception", x0: 1, z0: 9, x1: 9, z1: 19, doors: [{ x: 9, z: 14 }, { x: 9, z: 11 }] },
+];
+
 /** Named spots on the floor, in tile coordinates. */
 export const HOME_SPOTS: Record<string, { x: number; z: number; zone: string }> = {
-  lobby: { x: 20, z: 27, zone: "lobby" },
-  reception: { x: 17, z: 26, zone: "lobby" },
-  bell: { x: 22, z: 26, zone: "lobby" },
+  // entrance and reception (left)
+  entrance: { x: 1, z: 14, zone: "lobby" },
+  lobby: { x: 5, z: 14, zone: "lobby" },
+  reception: { x: 6, z: 11, zone: "lobby" },
+  bell: { x: 7, z: 12, zone: "lobby" },
+  couch: { x: 4, z: 17, zone: "lobby" },
+  // back wall
   ceo_office: { x: 4, z: 4, zone: "exec" },
-  pm_desk: { x: 11, z: 5, zone: "exec" },
-  dev_pod_1: { x: 20, z: 6, zone: "dev" },
-  dev_pod_2: { x: 24, z: 6, zone: "dev" },
-  dev_pod_3: { x: 20, z: 10, zone: "dev" },
-  dev_pod_4: { x: 24, z: 10, zone: "dev" },
-  design_corner: { x: 34, z: 5, zone: "design" },
-  qa_bench: { x: 34, z: 13, zone: "qa" },
-  meeting_room: { x: 10, z: 15, zone: "meeting" },
-  break_room: { x: 33, z: 24, zone: "break" },
-  server_closet: { x: 4, z: 24, zone: "it" },
-  cfo_desk: { x: 4, z: 12, zone: "finance" },
-  floating_1: { x: 12, z: 24, zone: "lobby" },
-  floating_2: { x: 15, z: 22, zone: "lobby" },
-  floating_3: { x: 27, z: 22, zone: "lobby" },
+  meeting_room: { x: 14, z: 5, zone: "meeting" },
+  kitchen: { x: 22, z: 4, zone: "break" },
+  // bullpen (center): PM by the whiteboard, dev cluster of four, two front desks
+  pm_desk: { x: 13, z: 12, zone: "exec" },
+  whiteboard: { x: 11, z: 10, zone: "exec" },
+  dev_pod_1: { x: 18, z: 12, zone: "dev" },
+  dev_pod_2: { x: 22, z: 12, zone: "dev" },
+  dev_pod_3: { x: 18, z: 16, zone: "dev" },
+  dev_pod_4: { x: 22, z: 16, zone: "dev" },
+  design_corner: { x: 17, z: 23, zone: "design" },
+  qa_bench: { x: 22, z: 23, zone: "qa" },
+  copier: { x: 14, z: 18, zone: "dev" },
+  // front-left corner
+  cfo_desk: { x: 5, z: 24, zone: "finance" },
+  // annex (right)
+  break_room: { x: 35, z: 4, zone: "break" },
+  vending: { x: 37, z: 2, zone: "break" },
+  floating_1: { x: 34, z: 11, zone: "annex" },
+  floating_2: { x: 34, z: 15, zone: "annex" },
+  floating_3: { x: 34, z: 19, zone: "annex" },
+  server_closet: { x: 35, z: 25, zone: "it" },
 };
 
 export const ROLE_HOME: Record<RoleId, string> = {

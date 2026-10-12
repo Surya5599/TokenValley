@@ -122,6 +122,8 @@ export class FakeGenerator {
       name: spec.name,
       tagline: spec.tagline,
       brief: spec.brief,
+      workspacePath: "",
+      live: false,
       rosterTemplate: "startup",
       palette: spec.palette,
       budget: { maxTurns: 200, maxTokens: 2_000_000 },
@@ -171,6 +173,7 @@ export class FakeGenerator {
   private step(): void {
     this.tick += 1;
     for (const company of this.town.companies.values()) {
+      if (company.live) continue; // real companies are driven by real agents
       if (company.phase === "out_of_budget" || company.phase === "paused") continue;
       // Each company gets one event per tick, at most. Background companies are quieter.
       const focused = company.id === this.town.focusedCompanyId;

@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 import { EventEmitter } from "node:events";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import type { ModelTier } from "@tokenvalley/shared";
 
@@ -92,9 +92,11 @@ export class ClaudeRunner extends EventEmitter<RunnerEvents> {
     if (opts.addDirs?.length) args.push("--add-dir", ...opts.addDirs);
     if (opts.resumeSessionId) args.push("--resume", opts.resumeSessionId);
     if (opts.maxBudgetUsd) args.push("--max-budget-usd", String(opts.maxBudgetUsd));
+    let cfgPath: string | null = null;
     if (opts.mcpServers) {
-      mkdirSync(opts.tempDir, { recursive: true });
-      const cfgPath = join(opts.tempDir, `mcp-${process.pid}-${Date.now()}.json`);
+      const tmp = join(opts.tempDir, "tmp");
+      mkdirSync(tmp, { recursive: true });
+      cfgPath = join(tmp, `mcp-${process.pid}-${Date.now()}.json`);
       writeFileSync(cfgPath, JSON.stringify({ mcpServers: opts.mcpServers }, null, 2));
       args.push("--mcp-config", cfgPath, "--strict-mcp-config");
     }
@@ -155,6 +157,9 @@ export class ClaudeRunner extends EventEmitter<RunnerEvents> {
 
     result.exitCode = await new Promise<number | null>((resolve) => child.on("close", resolve));
     this.child = null;
+    if (cfgPath) {
+      try { unlinkSync(cfgPath); } catch { /* already gone */ }
+    }
     return result;
   }
 
