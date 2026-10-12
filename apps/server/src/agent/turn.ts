@@ -111,6 +111,7 @@ function translate(opts: TurnOptions, name: string, input: Record<string, unknow
         };
         record.tasks.push(task);
         town.emit({ ...ev(town, cid), type: "task_created", task });
+        if (record.company.phase === "shipped") town.emit({ ...ev(town, cid), type: "company_phase", phase: "building" });
         break;
       }
       case "update_task": {

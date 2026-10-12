@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Agent, Company, Event, Task } from "@tokenvalley/shared";
+import type { Agent, Company, Event, Message, Task } from "@tokenvalley/shared";
 
 /**
  * Persists founded (live) companies between server restarts as plain JSON
@@ -17,6 +17,8 @@ export type CompanyRecord = {
   sessions: Record<string, string>;
   /** Chat channels beyond #general: one per meeting. */
   channels: { channel: string; title: string; memberIds: string[]; open: boolean }[];
+  /** Unread messages per agent id. Persisted so a restart loses nothing. */
+  inbox: Record<string, Message[]>;
 };
 
 export class CompanyRegistry {
@@ -42,6 +44,7 @@ export class CompanyRegistry {
       if (existsSync(f)) {
         const rec = JSON.parse(readFileSync(f, "utf8")) as CompanyRecord;
         rec.channels ??= [];
+        rec.inbox ??= {};
         for (const a of rec.agents) {
           a.style ??= "";
           a.job ??= "";

@@ -13,7 +13,6 @@ import { runAgentTurn } from "./agent/turn.js";
  */
 
 export class Scheduler {
-  private inbox = new Map<string, Message[]>(); // agentId -> unread
   private running = new Set<string>(); // agentIds mid-turn
   private lastTurnAt = new Map<string, number>(); // agentId -> ms
   private idleRounds = new Map<string, number>(); // companyId -> rounds with no work
@@ -55,13 +54,24 @@ export class Scheduler {
     return this.running.size;
   }
 
+  private inboxOf(companyId: string, agentId: string): Message[] {
+    const rec = this.records.get(companyId);
+    if (!rec) return [];
+    rec.inbox ??= {};
+    return (rec.inbox[agentId] ??= []);
+  }
+
+  private deliver(companyId: string, agentId: string, msg: Message): void {
+    this.inboxOf(companyId, agentId).push(msg);
+    const rec = this.records.get(companyId);
+    if (rec) this.registry.save(rec);
+  }
+
   /** A message from the founder lands in the CEO inbox and the CEO gets the next turn. */
   founderMessage(rec: CompanyRecord, text: string): void {
     const ceo = rec.agents.find((a) => a.role === "ceo");
     if (!ceo) return;
-    const list = this.inbox.get(ceo.id) ?? [];
-    list.push({ id: this.town.nextId("msg"), companyId: rec.company.id, from: "founder", to: ceo.id, text, taskId: null, timestamp: Date.now() });
-    this.inbox.set(ceo.id, list);
+    this.deliver(rec.company.id, ceo.id, { id: this.town.nextId("msg"), companyId: rec.company.id, from: "founder", to: ceo.id, text, taskId: null, timestamp: Date.now() });
     this.lastTurnAt.set(ceo.id, 0);
     this.idleRounds.delete(rec.company.id);
   }
@@ -70,13 +80,9 @@ export class Scheduler {
   private observe(e: Event): void {
     if (e.type === "send_message") {
       if (e.toAgentId === "founder") return;
-      const list = this.inbox.get(e.toAgentId) ?? [];
-      list.push(e.message);
-      this.inbox.set(e.toAgentId, list);
+      this.deliver(e.companyId, e.toAgentId, e.message);
     } else if (e.type === "handoff") {
-      const list = this.inbox.get(e.toAgentId) ?? [];
-      list.push({ id: e.id, companyId: e.companyId, from: e.agentId, to: e.toAgentId, text: `Handoff of task ${e.taskId}: ${e.note}`, taskId: e.taskId, timestamp: e.timestamp });
-      this.inbox.set(e.toAgentId, list);
+      this.deliver(e.companyId, e.toAgentId, { id: e.id, companyId: e.companyId, from: e.agentId, to: e.toAgentId, text: `Handoff of task ${e.taskId}: ${e.note}`, taskId: e.taskId, timestamp: e.timestamp });
     } else if (e.type === "post_message") {
       const rec = this.records.get(e.companyId);
       if (!rec) return;
@@ -86,33 +92,27 @@ export class Scheduler {
       const from = rec.agents.find((a) => a.id === e.agentId)?.name ?? e.agentId;
       for (const id of members) {
         if (id === e.agentId) continue;
-        const list = this.inbox.get(id) ?? [];
-        list.push({ id: `${e.id}_${id}`, companyId: e.companyId, from: e.agentId, to: id, text: `[#${e.post.channel}] ${from}: ${e.post.text}`, taskId: null, timestamp: e.timestamp });
-        this.inbox.set(id, list);
+        this.deliver(e.companyId, id, { id: `${e.id}_${id}`, companyId: e.companyId, from: e.agentId, to: id, text: `[#${e.post.channel}] ${from}: ${e.post.text}`, taskId: null, timestamp: e.timestamp });
       }
     } else if (e.type === "call_meeting") {
       const caller = this.records.get(e.companyId)?.agents.find((a) => a.id === e.agentId);
       for (const id of e.attendeeIds) {
         if (id === e.agentId) continue;
-        const list = this.inbox.get(id) ?? [];
         const channel = this.records.get(e.companyId)?.channels.find((c) => c.title === e.topic && c.memberIds.includes(id))?.channel ?? "general";
-        list.push({ id: `${e.id}_${id}`, companyId: e.companyId, from: e.agentId, to: id, text: `Meeting called by ${caller?.name ?? "a colleague"}: "${e.topic}". Post your position in #${channel} so everyone hears it.`, taskId: null, timestamp: e.timestamp });
-        this.inbox.set(id, list);
+        this.deliver(e.companyId, id, { id: `${e.id}_${id}`, companyId: e.companyId, from: e.agentId, to: id, text: `Meeting called by ${caller?.name ?? "a colleague"}: "${e.topic}". Post your position in #${channel} so everyone hears it.`, taskId: null, timestamp: e.timestamp });
       }
     } else if (e.type === "approval_resolved") {
       const rec = this.records.get(e.companyId);
       const ceo = rec?.agents.find((a) => a.role === "ceo");
       if (ceo) {
         const verdict = e.approval.status === "approved" ? "APPROVED" : "REJECTED";
-        const list = this.inbox.get(ceo.id) ?? [];
-        list.push({ id: e.id, companyId: e.companyId, from: "founder", to: ceo.id, text: `The founder ${verdict} your request "${e.approval.summary.slice(0, 80)}". ${e.approval.founderComment ?? ""}`.trim(), taskId: null, timestamp: e.timestamp });
-        this.inbox.set(ceo.id, list);
+        this.deliver(e.companyId, ceo.id, { id: e.id, companyId: e.companyId, from: "founder", to: ceo.id, text: `The founder ${verdict} your request "${e.approval.summary.slice(0, 80)}". ${e.approval.founderComment ?? ""}`.trim(), taskId: null, timestamp: e.timestamp });
       }
     }
   }
 
   private hasWork(rec: CompanyRecord, agent: Agent): boolean {
-    if ((this.inbox.get(agent.id)?.length ?? 0) > 0) return true;
+    if (this.inboxOf(rec.company.id, agent.id).length > 0) return true;
     return rec.tasks.some((t) => t.ownerAgentId === agent.id && (t.status === "backlog" || t.status === "in_progress"));
   }
 
@@ -121,16 +121,20 @@ export class Scheduler {
     for (const rec of this.records.values()) {
       const c = rec.company;
       if (!c.live || this.paused.has(c.id)) continue;
-      if (c.phase === "out_of_budget" || c.phase === "awaiting_approval" || c.phase === "paused" || c.phase === "shipped") continue;
+      if (c.phase === "out_of_budget" || c.phase === "awaiting_approval" || c.phase === "paused") continue;
       if (c.spend.turns >= c.budget.maxTurns) continue;
       if (this.town.liveSlotsFree() <= 0) return;
 
+      // A shipped company does no new task work, but it still answers messages
+      // (the founder most of all). New tasks reopen it; see translate() in turn.ts.
+      const shipped = c.phase === "shipped";
       const candidates = rec.agents
         .filter((a) => a.kind !== "npc" && a.status !== "retired" && a.model && !this.running.has(a.id))
-        .filter((a) => this.hasWork(rec, a))
+        .filter((a) => (shipped ? this.inboxOf(c.id, a.id).length > 0 : this.hasWork(rec, a)))
         .sort((a, b) => (this.lastTurnAt.get(a.id) ?? 0) - (this.lastTurnAt.get(b.id) ?? 0));
 
       if (candidates.length === 0) {
+        if (shipped) continue;
         const n = (this.idleRounds.get(c.id) ?? 0) + 1;
         this.idleRounds.set(c.id, n);
         if (n === 8) this.nudgeCeo(rec);
@@ -154,14 +158,13 @@ export class Scheduler {
     const text = open.length
       ? `Status check from the founder's office: ${open.length} task(s) still open and nobody is working. Assign owners or hand things off.`
       : `Status check from the founder's office: the board is empty. If the brief is done, request approval to ship. Otherwise create the next tasks.`;
-    const list = this.inbox.get(ceo.id) ?? [];
-    list.push({ id: this.town.nextId("msg"), companyId: rec.company.id, from: "founder", to: ceo.id, text, taskId: null, timestamp: Date.now() });
-    this.inbox.set(ceo.id, list);
+    this.deliver(rec.company.id, ceo.id, { id: this.town.nextId("msg"), companyId: rec.company.id, from: "founder", to: ceo.id, text, taskId: null, timestamp: Date.now() });
   }
 
   private buildPrompt(rec: CompanyRecord, agent: Agent): string {
-    const unread = this.inbox.get(agent.id) ?? [];
-    this.inbox.set(agent.id, []);
+    const unread = [...this.inboxOf(rec.company.id, agent.id)];
+    rec.inbox[agent.id] = [];
+    this.registry.save(rec);
     const nameOf = (id: string) => {
       if (id === "founder") return "founder";
       const a = rec.agents.find((x) => x.id === id);
