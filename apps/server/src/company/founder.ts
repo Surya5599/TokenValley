@@ -119,12 +119,14 @@ export function foundCompany(town: Town, registry: CompanyRegistry, input: Found
       currentTaskId: null,
       home: def.home,
       parentAgentId: null,
+      style: def.style,
+      job: def.job,
     };
     agents.push(agent);
     town.emit({ id: town.nextId("ev"), companyId: id, timestamp: Date.now(), type: "agent_spawned", agentId: agent.id, agent });
   }
 
-  const record: CompanyRecord = { company, agents, tasks: [], events: [], sessions: {} };
+  const record: CompanyRecord = { company, agents, tasks: [], events: [], sessions: {}, channels: [] };
   registry.save(record);
   return record;
 }

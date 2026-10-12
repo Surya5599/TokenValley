@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { ROLE_LABEL, type Agent, type Company, type Event, type RoleId, type Spend, type Task } from "@tokenvalley/shared";
 import type { Town } from "../town.js";
-import { loadRole, REPO_ROOT } from "../roles.js";
+import { loadPersona, loadRole, REPO_ROOT } from "../roles.js";
 import { ClaudeRunner } from "./claude-runner.js";
 import type { CompanyRecord, CompanyRegistry } from "../company/registry.js";
 
@@ -32,7 +32,7 @@ function agentByRole(record: CompanyRecord, role: string): Agent | undefined {
 }
 
 function systemPrompt(company: Company, agent: Agent, record: CompanyRecord): string {
-  const def = loadRole(agent.role);
+  const def = loadPersona(company.slug, agent.role);
   const colleagues = record.agents
     .filter((a) => a.id !== agent.id && a.kind !== "npc" && a.status !== "retired")
     .map((a) => `- ${a.role}: ${a.name}`)
@@ -60,8 +60,13 @@ function systemPrompt(company: Company, agent: Agent, record: CompanyRecord): st
     `## Task board`,
     board,
     ``,
+    `## Channels`,
+    `- #general: the whole company reads it. Post there for announcements, questions for the room, and banter.`,
+    ...record.channels.filter((c) => c.memberIds.includes(agent.id) && c.open).map((c) => `- #${c.channel}: ${c.title} (${c.memberIds.length} people). Post there to take part.`),
+    ``,
     `## Rules`,
     `- Use the tokenvalley tools to talk to colleagues and manage tasks. Keep messages short.`,
+    `- send_message is private, post is public. Prefer post when more than one person should hear it. Stay in character; disagree out loud when you disagree.`,
     `- Stay inside the project folder. Never reference other companies; there are none you know of.`,
     `- Budget: ${company.spend.turns}/${company.budget.maxTurns} turns used. Be economical.`,
   ].join("\n");
@@ -83,6 +88,16 @@ function translate(opts: TurnOptions, name: string, input: Record<string, unknow
         town.emit({
           ...ev(town, cid), type: "send_message", agentId: agent.id, toAgentId: toId,
           message: { id: town.nextId("msg"), companyId: cid, from: agent.id, to: toId, text: str("text"), taskId: agent.currentTaskId, timestamp: Date.now() },
+        });
+        break;
+      }
+      case "post": {
+        const channel = str("channel").replace(/^#/, "").trim().toLowerCase() || "general";
+        const known = channel === "general" || record.channels.some((c) => c.channel === channel && c.memberIds.includes(agent.id));
+        if (!known) break;
+        town.emit({
+          ...ev(town, cid), type: "post_message", agentId: agent.id,
+          post: { id: town.nextId("post"), companyId: cid, channel, from: agent.id, text: str("text"), timestamp: Date.now() },
         });
         break;
       }
@@ -122,8 +137,13 @@ function translate(opts: TurnOptions, name: string, input: Record<string, unknow
         const roles = Array.isArray(input.attendees) ? (input.attendees as string[]) : [];
         const ids = roles.map((r) => agentByRole(record, r.toLowerCase())?.id).filter((x): x is string => !!x);
         const meetingId = town.nextId("mt");
-        town.emit({ ...ev(town, cid), type: "call_meeting", agentId: agent.id, meetingId, attendeeIds: [agent.id, ...ids], topic: str("topic") });
-        setTimeout(() => town.emit({ ...ev(town, cid), type: "meeting_ended", meetingId }), 25_000);
+        const memberIds = [...new Set([agent.id, ...ids])];
+        const channel = `meeting-${record.channels.length + 1}`;
+        record.channels.push({ channel, title: str("topic"), memberIds, open: true });
+        town.emit({ ...ev(town, cid), type: "channel_opened", channel, title: str("topic"), memberIds });
+        town.emit({ ...ev(town, cid), type: "call_meeting", agentId: agent.id, meetingId, attendeeIds: memberIds, topic: str("topic") });
+        // The room stays open for the thread; the characters leave the table after a while.
+        setTimeout(() => town.emit({ ...ev(town, cid), type: "meeting_ended", meetingId }), 90_000);
         break;
       }
       case "request_approval": {
@@ -140,6 +160,7 @@ function translate(opts: TurnOptions, name: string, input: Record<string, unknow
         const hire: Agent = {
           id: town.nextId("ag"), companyId: cid, role, kind: "hire", name: `New hire (${ROLE_LABEL[role]})`,
           model: (input.model as Agent["model"]) ?? def.model, effort: def.effort, status: "idle", currentTaskId: null, home: def.home, parentAgentId: null,
+          style: def.style, job: def.job,
         };
         record.agents.push(hire);
         town.emit({ ...ev(town, cid), type: "agent_spawned", agentId: hire.id, agent: hire });
@@ -170,7 +191,7 @@ function translate(opts: TurnOptions, name: string, input: Record<string, unknow
     case "Task": case "Agent": {
       const contractor: Agent = {
         id: town.nextId("ctr"), companyId: cid, role: "intern", kind: "contractor", name: "Subagent", model: null, effort: "low",
-        status: "working", currentTaskId: agent.currentTaskId, home: agent.home, parentAgentId: agent.id,
+        status: "working", currentTaskId: agent.currentTaskId, home: agent.home, parentAgentId: agent.id, style: "", job: "",
       };
       town.emit({ ...ev(town, cid), type: "subagent_spawned", agentId: agent.id, contractor });
       break;

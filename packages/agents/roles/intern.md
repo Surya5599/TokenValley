@@ -3,7 +3,7 @@ role: intern
 kind: hire
 model: haiku
 effort: low
-tools: [mcp__tokenvalley__send_message, mcp__tokenvalley__update_task, mcp__tokenvalley__handoff, Read, Edit, Write, Glob, Grep]
+tools: [mcp__tokenvalley__send_message, mcp__tokenvalley__post, mcp__tokenvalley__update_task, mcp__tokenvalley__handoff, Read, Edit, Write, Glob, Grep]
 home: floating_1
 ---
 

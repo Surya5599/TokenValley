@@ -295,6 +295,33 @@ export class Director {
         }
         break;
       }
+      case "post_message": {
+        // The poster bubbles the text wherever they are: at a meeting seat
+        // for a meeting thread, at their desk for #general. Unknown ids are ignored.
+        const ch = this.characters.get(e.agentId);
+        if (!ch) break;
+        ch.say(e.post.text, 4);
+        const inMeeting = e.post.channel !== "general" && this.seatOf(e.agentId) !== null;
+        if (!inMeeting && !ch.isMoving && ch.state !== "celebrate") {
+          const prev = this.currentState(ch);
+          ch.setState("talk");
+          this.later(2.5, () => {
+            if (!ch.isMoving && ch.state === "talk") ch.setState(prev === "talk" ? "idle" : prev);
+          });
+        }
+        break;
+      }
+      case "channel_opened":
+        // A meeting thread opening is already shown by call_meeting.
+        break;
+      case "agent_persona_changed": {
+        const ch = this.characters.get(e.agentId);
+        const agent = this.store.agents.get(e.agentId);
+        if (!ch) break;
+        ch.setAgent(agent ? { ...agent } : { ...ch.agent, name: e.name, style: e.style, job: e.job });
+        ch.rebuildNameTag();
+        break;
+      }
       case "handoff": {
         const sender = this.characters.get(e.agentId);
         const recipient = this.characters.get(e.toAgentId);
@@ -596,6 +623,15 @@ export class Director {
           void ch.goTo(homeSpot, state);
         }
     }
+  }
+
+  /** The meeting seat an agent currently holds, if any. */
+  private seatOf(agentId: string): Tile | null {
+    for (const seats of this.seatsByMeeting.values()) {
+      const s = seats.get(agentId);
+      if (s) return s;
+    }
+    return null;
   }
 
   private assignSeats(meetingId: string, ids: string[]): Map<string, Tile> {

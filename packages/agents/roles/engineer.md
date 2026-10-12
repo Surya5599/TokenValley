@@ -3,7 +3,7 @@ role: engineer
 kind: core
 model: opus
 effort: high
-tools: [mcp__tokenvalley__send_message, mcp__tokenvalley__update_task, mcp__tokenvalley__read_board, mcp__tokenvalley__handoff, Read, Edit, Write, Glob, Grep, Bash]
+tools: [mcp__tokenvalley__send_message, mcp__tokenvalley__post, mcp__tokenvalley__update_task, mcp__tokenvalley__read_board, mcp__tokenvalley__handoff, Read, Edit, Write, Glob, Grep, Bash]
 home: dev_pod_1
 ---
 

@@ -27,6 +27,26 @@ function company(id: string, name: string, tagline: string, plot: number, palett
   };
 }
 
+/** Demo personas: the comedic style block and the job block per role. */
+const STYLE: Partial<Record<RoleId, string>> = {
+  ceo: "Speaks entirely in buzzwords and never finishes a metaphor.\nCalls every meeting an all-hands. Thinks 'synergy' is a verb.",
+  pm: "Relentlessly cheerful. Turns every problem into a ticket, then a sub-ticket.\nEnds sentences with 'does that make sense?'",
+  engineer: "Dry, terse, allergic to adjectives.\nAnswers questions with file paths.",
+  qa: "Measures everything, trusts nothing. Pixel counts are a personality trait.\nQuietly delighted when something breaks.",
+  designer: "Talks about colours like they are people with feelings.\nRefuses to say 'blue'; it is 'the blue'.",
+  it: "Has restarted it. Will restart it again.\nSighs audibly over the network.",
+  intern: "Eager, overcaffeinated, asks 'is this normal?' about everything.",
+};
+const JOB: Partial<Record<RoleId, string>> = {
+  ceo: "Owns the company brief and the plan. Talks to the founder, approves scope, calls meetings, and decides what ships.",
+  pm: "Breaks the brief into tasks, keeps the board honest, and unblocks engineers. Reports progress in #general.",
+  engineer: "Implements tasks in the workspace, runs tests, and hands finished work to QA.",
+  qa: "Writes and runs smoke tests, reports build status, and blocks shipping on regressions.",
+  designer: "Owns design tokens and layout. Reviews UI changes before they reach QA.",
+  it: "Keeps the build and tooling running. Responds to build failures.",
+  intern: "Helps whoever asks. Learns the codebase by reading it.",
+};
+
 function agent(id: string, companyId: string, role: RoleId, name: string, status: Agent["status"] = "idle"): Agent {
   const kind: Agent["kind"] = role === "cfo" || role === "receptionist" ? "npc" : ["ceo", "pm", "engineer", "qa", "designer"].includes(role) ? "core" : "hire";
   return {
@@ -41,7 +61,13 @@ function agent(id: string, companyId: string, role: RoleId, name: string, status
     currentTaskId: null,
     home: ROLE_HOME[role],
     parentAgentId: null,
+    style: kind === "npc" ? "" : (STYLE[role] ?? ""),
+    job: kind === "npc" ? "" : (JOB[role] ?? ""),
   };
+}
+
+function post(companyId: string, channel: string, from: string, text: string) {
+  return { id: nextId("post"), companyId, channel, from, text, timestamp: Date.now() };
 }
 
 function task(id: string, companyId: string, title: string, ownerRole: RoleId | null, ownerAgentId: string | null, status: Task["status"]): Task {
@@ -109,6 +135,7 @@ function buildScript(): EventFactory[] {
   const spendWarn = { turns: 165, inputTokens: 1_500_000, outputTokens: 310_000, estimatedUsd: 14.8 };
   const budgetA = { maxTurns: 200, maxTokens: 2_000_000 };
   let founded = false;
+  let personaFlip = false;
 
   return [
     () => ({ ...base(A), type: "agent_spawned", agentId: intern.id, agent: { ...intern } }),
@@ -132,8 +159,20 @@ function buildScript(): EventFactory[] {
       toAgentId: pf.des.id,
       message: { id: nextId("msg"), companyId: A, from: pf.qa.id, to: pf.des.id, text: "The button is two pixels off. I measured.", taskId: null, timestamp: Date.now() },
     }),
+    // #general banter round.
+    () => ({ ...base(A), type: "post_message", agentId: pf.pm.id, post: post(A, "general", pf.pm.id, "Morning all! Nav fix is the priority today. Does that make sense?") }),
+    () => ({ ...base(A), type: "post_message", agentId: pf.eng.id, post: post(A, "general", pf.eng.id, "src/components/Nav.tsx. On it.") }),
+    () => ({ ...base(A), type: "post_message", agentId: pf.qa.id, post: post(A, "general", pf.qa.id, "I will be measuring it.") }),
+    () => ({ ...base(A), type: "post_message", agentId: pf.qa.id, post: post(A, "general", pf.qa.id, "In pixels. Individually.") }),
+    () => ({ ...base(A), type: "post_message", agentId: pf.des.id, post: post(A, "general", pf.des.id, "If anyone touches the blue, the blue will know.") }),
     () => ({ ...base(B), type: "task_started", agentId: ll.qa.id, task: { ...task("ll-t2", B, "Reconcile totals", "qa", ll.qa.id, "in_progress") } }),
     () => ({ ...base(A), type: "call_meeting", agentId: pf.ceo.id, meetingId: "pf-m1", attendeeIds: [pf.pm.id, pf.des.id, pf.eng.id], topic: "Synergy alignment all-hands" }),
+    () => ({ ...base(A), type: "channel_opened", channel: "meeting-1", title: "Synergy alignment all-hands", memberIds: [pf.ceo.id, pf.pm.id, pf.des.id, pf.eng.id] }),
+    // Meeting thread.
+    () => ({ ...base(A), type: "post_message", agentId: pf.ceo.id, post: post(A, "meeting-1", pf.ceo.id, "Team. Let's circle back on the nav and really boil the ocean here.") }),
+    () => ({ ...base(A), type: "post_message", agentId: pf.pm.id, post: post(A, "meeting-1", pf.pm.id, "Boiling is ticket PF-5. I made a sub-ticket for the lid.") }),
+    () => ({ ...base(A), type: "post_message", agentId: pf.eng.id, post: post(A, "meeting-1", pf.eng.id, "Nav.tsx line 42. Fixed by Friday.") }),
+    () => ({ ...base(A), type: "post_message", agentId: pf.des.id, post: post(A, "meeting-1", pf.des.id, "Friday is fine. The blue needs the weekend anyway.") }),
     () => ({ ...base(A), type: "tool_read_file", agentId: pf.qa.id, path: "tests/smoke.test.ts" }),
     () => ({ ...base(A), type: "meeting_ended", meetingId: "pf-m1" }),
     () => ({ ...base(A), type: "task_blocked", agentId: pf.eng.id, taskId: "pf-t5", blockedByRole: "designer", reason: "Need final nav colors" }),
@@ -180,6 +219,14 @@ function buildScript(): EventFactory[] {
       };
     },
     () => ({ ...base(A), type: "agent_status", agentId: pf.qa.id, status: "idle", line: "Back from coffee" }),
+    () => {
+      // The founder (or the script) rewrites the CEO's persona; alternates each loop.
+      personaFlip = !personaFlip;
+      return personaFlip
+        ? { ...base(A), type: "agent_persona_changed", agentId: pf.ceo.id, name: "Dana (CEO)", style: "Has discovered plain English. Suspicious of it.\nStill calls meetings all-hands.", job: JOB.ceo ?? "" }
+        : { ...base(A), type: "agent_persona_changed", agentId: pf.ceo.id, name: "Dana (CEO)", style: STYLE.ceo ?? "", job: JOB.ceo ?? "" };
+    },
+    () => ({ ...base(A), type: "post_message", agentId: pf.ceo.id, post: post(A, "general", pf.ceo.id, "Great synergy today, everyone. Let's take this offline. Online.") }),
     () => ({ ...base(A), type: "agent_retired", agentId: intern.id }),
     () => ({ ...base(B), type: "company_phase", phase: "building" }),
     () => ({ ...base(B), type: "spend_updated", spend: { turns: 120, inputTokens: 900_000, outputTokens: 120_000, estimatedUsd: 9.4 } }),

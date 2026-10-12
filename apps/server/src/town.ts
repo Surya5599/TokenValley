@@ -99,6 +99,9 @@ export class Town {
       case "agent_model_changed":
         this.patchAgent(e.agentId, { model: e.model });
         break;
+      case "agent_persona_changed":
+        this.patchAgent(e.agentId, { name: e.name, style: e.style, job: e.job });
+        break;
       case "task_created":
       case "task_updated":
         this.tasks.set(e.task.id, e.task);

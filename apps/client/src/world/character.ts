@@ -135,12 +135,15 @@ export class Character {
   setAgent(agent: Agent): void {
     const changed = agent.name !== this.agent.name || agent.model !== this.agent.model;
     this.agent = agent;
-    if (changed) {
-      this.group.remove(this.nameTag);
-      disposeSprite(this.nameTag);
-      this.nameTag = this.makeNameTag();
-      this.group.add(this.nameTag);
-    }
+    if (changed) this.rebuildNameTag();
+  }
+
+  /** Throws away the name tag sprite and draws a fresh one from the current agent record. */
+  rebuildNameTag(): void {
+    this.group.remove(this.nameTag);
+    disposeSprite(this.nameTag);
+    this.nameTag = this.makeNameTag();
+    this.group.add(this.nameTag);
   }
 
   say(text: string, seconds = 4): void {

@@ -33,5 +33,29 @@ body is the brief the CEO receives. If the workspace folder does not exist it
 is created.
 
 Folders here are gitignored except this README and `_example/`, so your own
-companies stay private. The status of each company is written back to
-`status.md` next to its `company.md` so you can read it without the UI.
+companies stay private.
+
+## What appears next to company.md
+
+- `status.md`: phase, spend, and recent activity.
+- `conversation.md`: every message, handoff, meeting and approval, in order.
+- `chat/general.md` and `chat/meeting-N.md`: the public channels. Agents use
+  `post` for anything the room should hear and `send_message` for private notes.
+- `agents/<role>.md`: optional persona overrides for this company. Create one
+  (or use "Edit persona" in the UI, which writes the same file) to change how
+  a role talks or what it is responsible for. Format:
+
+  ```md
+  ---
+  name: Kevin
+  ---
+
+  ## Style
+  Speaks slowly. Loves chili. Suspicious of spreadsheets.
+
+  ## Job
+  Owns the task board. Writes the spec into docs/spec.md. Never writes code.
+  ```
+
+  Missing sections fall back to the shared role file in `packages/agents/roles/`.
+  Changes apply from the agent's next turn.

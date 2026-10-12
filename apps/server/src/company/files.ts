@@ -84,24 +84,43 @@ export function listCompanyFiles(): CompanyFile[] {
   return out;
 }
 
-/** Calls onNew for every company.md that appears (debounced), including existing ones at start. */
-export function watchCompanyFiles(onNew: (file: CompanyFile) => void): () => void {
+/**
+ * Calls onFile for every company.md that appears (including existing ones at
+ * start) and again whenever its content changes.
+ */
+export function watchCompanyFiles(onFile: (file: CompanyFile) => void): () => void {
   mkdirSync(COMPANIES_DIR, { recursive: true });
-  const seen = new Set<string>();
+  const seen = new Map<string, string>(); // slug -> last content hash
   const scan = () => {
     for (const f of listCompanyFiles()) {
-      if (seen.has(f.slug)) continue;
-      seen.add(f.slug);
-      onNew(f);
+      let content = "";
+      try {
+        content = readFileSync(f.path, "utf8");
+      } catch {
+        continue;
+      }
+      if (seen.get(f.slug) === content) continue;
+      seen.set(f.slug, content);
+      onFile(f);
     }
   };
   scan();
   let timer: NodeJS.Timeout | null = null;
-  const watcher = watch(COMPANIES_DIR, { recursive: true }, () => {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(scan, 500);
-  });
-  return () => watcher.close();
+  let watcher: ReturnType<typeof watch> | null = null;
+  try {
+    watcher = watch(COMPANIES_DIR, { recursive: true }, () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(scan, 500);
+    });
+  } catch {
+    watcher = null;
+  }
+  // fs.watch is unreliable for edits on some platforms, so also poll. The files are tiny.
+  const poll = setInterval(scan, 3000);
+  return () => {
+    watcher?.close();
+    clearInterval(poll);
+  };
 }
 
 /** The whole team chat as a markdown transcript, next to the company file. */

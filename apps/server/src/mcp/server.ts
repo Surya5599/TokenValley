@@ -40,6 +40,16 @@ server.tool(
 );
 
 server.tool(
+  "post",
+  "Post to a channel everyone in it reads. channel=general reaches the whole company; a meeting channel (e.g. meeting-3) reaches its attendees. Use this for anything more than one person should hear. Keep it to a few lines.",
+  { channel: z.string().describe("general, or a meeting channel name you were invited to"), text: z.string().max(800) },
+  async ({ channel, text }) => {
+    record("post", { channel, text });
+    return ok(`Posted to #${channel}.`);
+  },
+);
+
+server.tool(
   "create_task",
   "Create a task on the company board.",
   {

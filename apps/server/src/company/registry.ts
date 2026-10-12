@@ -15,6 +15,8 @@ export type CompanyRecord = {
   events: Event[];
   /** Claude Code session id per core agent, so resumed turns keep memory. */
   sessions: Record<string, string>;
+  /** Chat channels beyond #general: one per meeting. */
+  channels: { channel: string; title: string; memberIds: string[]; open: boolean }[];
 };
 
 export class CompanyRegistry {
@@ -37,7 +39,15 @@ export class CompanyRegistry {
     const slugs = JSON.parse(readFileSync(idx, "utf8")) as string[];
     for (const slug of slugs) {
       const f = this.file(slug);
-      if (existsSync(f)) out.push(JSON.parse(readFileSync(f, "utf8")) as CompanyRecord);
+      if (existsSync(f)) {
+        const rec = JSON.parse(readFileSync(f, "utf8")) as CompanyRecord;
+        rec.channels ??= [];
+        for (const a of rec.agents) {
+          a.style ??= "";
+          a.job ??= "";
+        }
+        out.push(rec);
+      }
     }
     return out;
   }

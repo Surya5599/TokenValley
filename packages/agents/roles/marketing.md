@@ -3,7 +3,7 @@ role: marketing
 kind: hire
 model: haiku
 effort: low
-tools: [mcp__tokenvalley__send_message, mcp__tokenvalley__update_task, mcp__tokenvalley__handoff, Read, Glob, Grep, Write]
+tools: [mcp__tokenvalley__send_message, mcp__tokenvalley__post, mcp__tokenvalley__update_task, mcp__tokenvalley__handoff, Read, Glob, Grep, Write]
 home: floating_1
 ---
 

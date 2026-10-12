@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { RoleId, ModelTier, type Effort, type AgentKind } from "@tokenvalley/shared";
@@ -65,6 +65,39 @@ export function loadRole(role: RoleId): RoleDef {
     style: section(body, "Style"),
     job: section(body, "Job"),
   };
+}
+
+export type Persona = { name?: string; style: string; job: string };
+
+function personaFile(companySlug: string, role: RoleId): string {
+  return join(REPO_ROOT, "companies", companySlug, "agents", `${role}.md`);
+}
+
+/**
+ * The persona a company actually uses for a role: the role file, overridden
+ * by companies/<slug>/agents/<role>.md when it exists. Edit that file by hand
+ * or through the UI; it is read fresh at every turn.
+ */
+export function loadPersona(companySlug: string, role: RoleId): Persona {
+  const def = loadRole(role);
+  const file = personaFile(companySlug, role);
+  if (!existsSync(file)) return { style: def.style, job: def.job };
+  try {
+    const { meta, body } = parseFrontMatter(readFileSync(file, "utf8"));
+    const style = section(body, "Style");
+    const job = section(body, "Job");
+    return { name: meta.name, style: style || def.style, job: job || def.job };
+  } catch {
+    return { style: def.style, job: def.job };
+  }
+}
+
+export function savePersona(companySlug: string, role: RoleId, persona: Persona): string {
+  const file = personaFile(companySlug, role);
+  mkdirSync(join(file, ".."), { recursive: true });
+  const fm = persona.name ? `---\nname: ${persona.name}\n---\n\n` : "";
+  writeFileSync(file, `${fm}## Style\n${persona.style.trim()}\n\n## Job\n${persona.job.trim()}\n`);
+  return file;
 }
 
 export function loadAllRoles(): Map<RoleId, RoleDef> {

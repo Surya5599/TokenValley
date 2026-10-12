@@ -1,5 +1,6 @@
-import { FoundCompanyInput, ROLE_LABEL, type Event, type ModelTier, type RoleId, type TaskStatus } from "@tokenvalley/shared";
-import { FOUNDER_ID, type CameraMode, type Store } from "../state/store";
+import { FoundCompanyInput, ROLE_LABEL, type Company, type Event, type ModelTier, type RoleId, type TaskStatus } from "@tokenvalley/shared";
+import { CHANNEL_FOUNDER, CHANNEL_GENERAL, FOUNDER_ID, type CameraMode, type ChatLine, type PanelTab, type Store } from "../state/store";
+import { ROLE_COLOR } from "../world/character";
 
 export interface OverlayActions {
   focusCompany: (companyId: string) => void;
@@ -9,9 +10,20 @@ export interface OverlayActions {
   foundCompany: (input: FoundCompanyInput) => void;
   resolveApproval: (approvalId: string, status: "approved" | "rejected", comment: string | null) => void;
   sendFounderMessage: (companyId: string, text: string) => void;
+  setAgentPersona: (agentId: string, name: string, style: string, job: string) => void;
 }
 
 const INBOX_LIMIT = 8;
+/** Consecutive messages by one author within this window share a header. */
+const COLLAPSE_MS = 2 * 60 * 1000;
+const PERSONA_NAME_MAX = 60;
+const PERSONA_STYLE_MAX = 2000;
+const PERSONA_JOB_MAX = 4000;
+
+const PANEL_TABS: { tab: PanelTab; label: string }[] = [
+  { tab: "company", label: "Company" },
+  { tab: "chat", label: "Chat" },
+];
 
 const CAMERA_MODES: { mode: CameraMode; label: string; key: string }[] = [
   { mode: "valley", label: "Valley", key: "1" },
@@ -54,6 +66,30 @@ function fmtTime(ts: number): string {
   return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
 
+function fmtClock(ts: number): string {
+  const d = new Date(ts);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function firstName(name: string): string {
+  return name.split(/[\s(]/)[0] ?? name;
+}
+
+function firstLine(text: string): string {
+  return text.split(/\r?\n/).find((l) => l.trim().length > 0)?.trim() ?? "";
+}
+
+function cssColor(n: number): string {
+  return `#${n.toString(16).padStart(6, "0")}`;
+}
+
+/** Mixes a packed RGB colour toward white so dark role colours stay readable as text on the panel. */
+function lightened(n: number, amount = 0.45): string {
+  const ch = (shift: number) => Math.round(((n >> shift) & 0xff) + (255 - ((n >> shift) & 0xff)) * amount);
+  return `rgb(${ch(16)}, ${ch(8)}, ${ch(0)})`;
+}
+
 function base(path: string): string {
   const parts = path.split(/[\\/]/);
   return parts[parts.length - 1] ?? path;
@@ -92,6 +128,12 @@ export function describeEvent(e: Event, store: Store): { text: string; tone: "no
       return { text: `${name(e.agentId)} ran: ${e.command}`, tone: "normal" };
     case "send_message":
       return { text: `${name(e.agentId)} to ${name(e.toAgentId)}: ${e.message.text}`, tone: "normal" };
+    case "post_message":
+      return { text: `${name(e.agentId)} in #${e.post.channel}: ${e.post.text}`, tone: "normal" };
+    case "channel_opened":
+      return { text: `Opened #${e.channel}: ${e.title}`, tone: "normal" };
+    case "agent_persona_changed":
+      return { text: `${e.name} has a new persona`, tone: "normal" };
     case "handoff":
       return { text: `${name(e.agentId)} handed "${task(e.taskId)}" to ${name(e.toAgentId)}`, tone: "normal" };
     case "call_meeting":
@@ -141,9 +183,23 @@ export class Overlay {
   private readonly approvalBody: HTMLElement;
   private readonly approvalComment: HTMLTextAreaElement;
   private approvalOpenId: string | null = null;
+  private readonly personaBackdrop: HTMLElement;
+  private readonly personaTitle: HTMLElement;
+  private readonly personaName: HTMLInputElement;
+  private readonly personaStyle: HTMLTextAreaElement;
+  private readonly personaJob: HTMLTextAreaElement;
+  private readonly personaStyleField: HTMLElement;
+  private readonly personaJobField: HTMLElement;
+  private readonly personaNpcNote: HTMLElement;
+  private readonly personaError: HTMLElement;
+  private personaOpenId: string | null = null;
   private inboxDraft = "";
   private scheduled = false;
   private lastFeedKey = "";
+  /** Chat view scroll memory: stick to the bottom unless the founder scrolled up. */
+  private chatAtBottom = true;
+  private chatScrollTop = 0;
+  private chatScrollKey = "";
 
   constructor(
     root: HTMLElement,
@@ -242,8 +298,128 @@ export class Overlay {
     });
     root.append(this.approvalBackdrop);
 
+    // Persona editor modal.
+    this.personaBackdrop = el("div", "modal-backdrop");
+    const pmodal = el("div", "modal persona");
+    this.personaTitle = el("h2", "", "Edit persona");
+    pmodal.append(this.personaTitle);
+    const pform = el("form");
+    const pfield = (label: string, input: HTMLElement, hint?: string) => {
+      const wrap = el("div");
+      wrap.append(el("label", "", label), input);
+      if (hint) wrap.append(el("div", "hintline", hint));
+      return wrap;
+    };
+    this.personaName = el("input");
+    this.personaName.name = "name";
+    this.personaName.type = "text";
+    this.personaName.maxLength = PERSONA_NAME_MAX;
+    this.personaName.placeholder = "Dana (CEO)";
+    pform.append(pfield("Name", this.personaName));
+    this.personaNpcNote = el("div", "npc-note", "This is an NPC: there is no model behind them, so they have no style or job. Only the name can change.");
+    pform.append(this.personaNpcNote);
+    this.personaStyle = el("textarea");
+    this.personaStyle.name = "style";
+    this.personaStyle.rows = 4;
+    this.personaStyle.maxLength = PERSONA_STYLE_MAX;
+    this.personaStyleField = pfield("Style", this.personaStyle, "How they talk. Comedy lives here.");
+    pform.append(this.personaStyleField);
+    this.personaJob = el("textarea");
+    this.personaJob.name = "job";
+    this.personaJob.rows = 8;
+    this.personaJob.maxLength = PERSONA_JOB_MAX;
+    this.personaJobField = pfield("Job", this.personaJob, "What they are responsible for. Keep comedy out.");
+    pform.append(this.personaJobField);
+    this.personaError = el("div", "error");
+    pform.append(this.personaError);
+    const pactions = el("div", "actions");
+    const pcancel = el("button", "", "Cancel");
+    pcancel.type = "button";
+    pcancel.addEventListener("click", () => this.closePersona());
+    const psave = el("button", "primary", "Save");
+    psave.type = "submit";
+    pactions.append(pcancel, psave);
+    pform.append(pactions);
+    pform.addEventListener("submit", (e) => {
+      e.preventDefault();
+      this.submitPersona();
+    });
+    pmodal.append(pform);
+    this.personaBackdrop.append(pmodal);
+    this.personaBackdrop.addEventListener("click", (e) => {
+      if (e.target === this.personaBackdrop) this.closePersona();
+    });
+    root.append(this.personaBackdrop);
+
     store.onChange(() => this.schedule());
     this.render();
+  }
+
+  // ---- persona modal ------------------------------------------------------------
+
+  isPersonaOpen(): boolean {
+    return this.personaOpenId !== null;
+  }
+
+  /** Opens the editor pre-filled from the agent's current persona. */
+  openPersona(agentId: string): void {
+    const a = this.store.agents.get(agentId);
+    if (!a) return;
+    this.personaOpenId = agentId;
+    const npc = a.kind === "npc";
+    this.personaTitle.textContent = `Edit ${a.name}`;
+    this.personaName.value = a.name;
+    this.personaStyle.value = a.style;
+    this.personaJob.value = a.job;
+    this.personaNpcNote.style.display = npc ? "" : "none";
+    this.personaStyleField.style.display = npc ? "none" : "";
+    this.personaJobField.style.display = npc ? "none" : "";
+    this.personaError.textContent = "";
+    this.personaBackdrop.classList.add("open");
+    this.personaName.focus();
+    this.personaName.select();
+  }
+
+  /** Closes the editor; with an id, only if that agent is the one being edited. */
+  closePersona(agentId?: string): void {
+    if (agentId !== undefined && this.personaOpenId !== agentId) return;
+    this.personaOpenId = null;
+    this.personaBackdrop.classList.remove("open");
+  }
+
+  private submitPersona(): void {
+    const id = this.personaOpenId;
+    if (!id) return;
+    const a = this.store.agents.get(id);
+    if (!a) {
+      this.closePersona();
+      return;
+    }
+    const name = this.personaName.value.trim();
+    if (!name) {
+      this.personaError.textContent = "Name cannot be empty.";
+      return;
+    }
+    const npc = a.kind === "npc";
+    const style = npc ? "" : this.personaStyle.value;
+    const job = npc ? "" : this.personaJob.value;
+    this.personaError.textContent = "";
+    this.actions.setAgentPersona(id, name.slice(0, PERSONA_NAME_MAX), style.slice(0, PERSONA_STYLE_MAX), job.slice(0, PERSONA_JOB_MAX));
+  }
+
+  // ---- panel tabs / chat ---------------------------------------------------------
+
+  setPanelTab(tab: PanelTab): void {
+    if (this.store.panelTab === tab) return;
+    this.store.panelTab = tab;
+    this.chatAtBottom = true;
+    this.store.notify();
+  }
+
+  private selectChannel(companyId: string, key: string): void {
+    this.store.chatChannel.set(companyId, key);
+    this.chatAtBottom = true;
+    this.store.notify();
   }
 
   // ---- approval modal ------------------------------------------------------------
@@ -457,8 +633,23 @@ export class Overlay {
     const c = store.focusedCompany();
     const panel = this.panel;
     panel.replaceChildren();
+    panel.classList.toggle("chat", store.panelTab === "chat" && c !== null);
     if (!c) {
       panel.append(el("div", "empty", "No company focused. Click a building or a tab."));
+      return;
+    }
+    // Tab strip: Company | Chat. Chat carries the total unread count.
+    const strip = el("div", "panel-tabs");
+    const totalUnread = this.channelKeys(c).reduce((n, k) => n + store.unreadCount(c.id, k.key), 0);
+    for (const t of PANEL_TABS) {
+      const b = el("button", `ptab${store.panelTab === t.tab ? " active" : ""}`, t.label);
+      if (t.tab === "chat" && totalUnread > 0) b.append(el("span", "unread", String(totalUnread)));
+      b.addEventListener("click", () => this.setPanelTab(t.tab));
+      strip.append(b);
+    }
+    panel.append(strip);
+    if (store.panelTab === "chat") {
+      this.renderChat(c);
       return;
     }
     const title = el("h2", "", c.name);
@@ -507,28 +698,7 @@ export class Overlay {
     }
     panel.append(inbox);
     inbox.scrollTop = inbox.scrollHeight;
-    const compose = el("form", "compose");
-    const input = el("input");
-    input.type = "text";
-    input.placeholder = store.demo ? "Disabled in demo mode" : "Message the CEO";
-    input.value = this.inboxDraft;
-    input.maxLength = 2000;
-    const canSend = !store.demo && store.connection === "connected";
-    input.disabled = !canSend;
-    input.addEventListener("input", () => (this.inboxDraft = input.value));
-    const send = el("button", "primary", "Send");
-    send.type = "submit";
-    send.disabled = !canSend;
-    compose.append(input, send);
-    compose.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const text = input.value.trim();
-      if (!text || !canSend) return;
-      this.actions.sendFounderMessage(c.id, text);
-      this.inboxDraft = "";
-      input.value = "";
-    });
-    panel.append(compose);
+    panel.append(this.buildCompose(c));
 
     // Agents.
     panel.append(el("h3", "", "Agents"));
@@ -540,10 +710,29 @@ export class Overlay {
       row.append(el("span", `status-dot ${a.status}`));
       const mid = el("div");
       mid.append(el("div", "name", a.name));
+      const styleLine = firstLine(a.style);
+      if (styleLine) {
+        const s = el("div", "line style", styleLine);
+        s.title = a.style;
+        mid.append(s);
+      }
       const line = store.agentLines.get(a.id) ?? `${ROLE_LABEL[a.role]} · ${a.status}${a.currentTaskId ? ` · ${store.tasks.get(a.currentTaskId)?.title ?? ""}` : ""}`;
       mid.append(el("div", "line", line));
       row.append(mid);
-      row.append(el("span", `badge ${a.model ?? "none"}`, a.model ? a.model.toUpperCase() : a.kind === "npc" ? "NPC" : "-"));
+      const right = el("div", "agent-right");
+      right.append(el("span", `badge ${a.model ?? "none"}`, a.model ? a.model.toUpperCase() : a.kind === "npc" ? "NPC" : "-"));
+      if (a.kind !== "contractor") {
+        const edit = el("button", "icon edit", "✎");
+        edit.type = "button";
+        edit.title = "Edit persona";
+        edit.setAttribute("aria-label", `Edit ${a.name}`);
+        edit.addEventListener("click", (ev) => {
+          ev.stopPropagation();
+          this.openPersona(a.id);
+        });
+        right.append(edit);
+      }
+      row.append(right);
       row.title = "Select for follow camera";
       row.addEventListener("click", () => this.actions.selectAgent(a.id));
       agents.append(row);
@@ -565,6 +754,151 @@ export class Overlay {
       kanban.append(colEl);
     }
     panel.append(kanban);
+  }
+
+  /** The founder's compose box; used by the inbox and by the Founder chat channel. */
+  private buildCompose(c: Company): HTMLFormElement {
+    const store = this.store;
+    const compose = el("form", "compose");
+    const input = el("input");
+    input.type = "text";
+    input.placeholder = store.demo ? "Disabled in demo mode" : "Message the CEO";
+    input.value = this.inboxDraft;
+    input.maxLength = 2000;
+    const canSend = !store.demo && store.connection === "connected";
+    input.disabled = !canSend;
+    input.addEventListener("input", () => (this.inboxDraft = input.value));
+    const send = el("button", "primary", "Send");
+    send.type = "submit";
+    send.disabled = !canSend;
+    compose.append(input, send);
+    compose.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text || !canSend) return;
+      this.actions.sendFounderMessage(c.id, text);
+      this.inboxDraft = "";
+      input.value = "";
+    });
+    return compose;
+  }
+
+  /** The channel list for a company: #general, meetings, Founder, then DM pairs. */
+  private channelKeys(c: Company): { key: string; label: string; sub: string; group: "channels" | "dms" }[] {
+    const store = this.store;
+    const name = (id: string) => (id === FOUNDER_ID ? "Founder" : firstName(store.agents.get(id)?.name ?? id));
+    const out: { key: string; label: string; sub: string; group: "channels" | "dms" }[] = [{ key: CHANNEL_GENERAL, label: "#general", sub: "", group: "channels" }];
+    for (const ch of store.channelsOf(c.id)) {
+      if (ch.channel === CHANNEL_GENERAL) continue;
+      out.push({ key: ch.channel, label: `#${ch.channel}`, sub: `${ch.title} · ${ch.memberIds.length}`, group: "channels" });
+    }
+    out.push({ key: CHANNEL_FOUNDER, label: "Founder", sub: "", group: "channels" });
+    for (const t of store.dmThreadsOf(c.id)) out.push({ key: t.key, label: `${name(t.a)} ↔ ${name(t.b)}`, sub: "", group: "dms" });
+    return out;
+  }
+
+  private renderChat(c: Company): void {
+    const store = this.store;
+    const panel = this.panel;
+    const keys = this.channelKeys(c);
+    let active = store.chatChannel.get(c.id) ?? CHANNEL_GENERAL;
+    if (!keys.some((k) => k.key === active)) active = CHANNEL_GENERAL;
+    store.chatChannel.set(c.id, active);
+    // Everything in the open channel counts as seen.
+    store.markChannelViewed(c.id, active);
+
+    const head = el("div", "chat-head");
+    head.append(el("span", "chat-company", c.name));
+    const activeEntry = keys.find((k) => k.key === active);
+    head.append(el("span", "chat-channel", activeEntry?.label ?? active));
+    panel.append(head);
+
+    const body = el("div", "chat-body");
+    // Channel list.
+    const list = el("div", "chat-channels");
+    const section = (label: string) => list.append(el("div", "chat-section", label));
+    section("Channels");
+    let dmHeader = false;
+    for (const k of keys) {
+      if (k.group === "dms" && !dmHeader) {
+        section("DMs");
+        dmHeader = true;
+      }
+      const b = el("button", `chan${k.key === active ? " active" : ""}`);
+      const text = el("span", "chan-text");
+      text.append(el("span", "chan-label", k.label));
+      if (k.sub) text.append(el("span", "chan-sub", k.sub));
+      b.append(text);
+      const unread = store.unreadCount(c.id, k.key);
+      if (unread > 0) b.append(el("span", "unread", String(unread)));
+      b.title = k.sub ? `${k.label} — ${k.sub}` : k.label;
+      b.addEventListener("click", () => this.selectChannel(c.id, k.key));
+      list.append(b);
+    }
+    body.append(list);
+
+    // Message list.
+    const right = el("div", "chat-main");
+    const msgs = el("div", "chat-msgs");
+    const lines = store.channelMessagesOf(c.id, active);
+    if (lines.length === 0) msgs.append(el("div", "empty", active === CHANNEL_FOUNDER ? "No messages yet. Say hi to the CEO." : "Nothing posted here yet."));
+    let prev: ChatLine | null = null;
+    for (const m of lines) {
+      const collapse = prev !== null && prev.from === m.from && m.timestamp - prev.timestamp <= COLLAPSE_MS;
+      msgs.append(this.buildChatRow(m, collapse));
+      prev = m;
+    }
+    right.append(msgs);
+    if (active === CHANNEL_FOUNDER) right.append(this.buildCompose(c));
+    body.append(right);
+    panel.append(body);
+
+    // Keep the scroll position across re-renders: stick to the bottom when
+    // the founder was at the bottom, otherwise restore where they were.
+    const scrollKey = `${c.id}:${active}`;
+    if (scrollKey !== this.chatScrollKey) {
+      this.chatScrollKey = scrollKey;
+      this.chatAtBottom = true;
+    }
+    msgs.addEventListener("scroll", () => {
+      this.chatScrollTop = msgs.scrollTop;
+      this.chatAtBottom = msgs.scrollTop + msgs.clientHeight >= msgs.scrollHeight - 6;
+    });
+    if (this.chatAtBottom) msgs.scrollTop = msgs.scrollHeight;
+    else msgs.scrollTop = this.chatScrollTop;
+  }
+
+  private buildChatRow(m: ChatLine, collapse: boolean): HTMLElement {
+    const store = this.store;
+    const isFounder = m.from === FOUNDER_ID;
+    const agent = isFounder ? null : (store.agents.get(m.from) ?? null);
+    const row = el("div", `cmsg${collapse ? " cont" : ""}${isFounder ? " founder" : ""}`);
+    const color = isFounder ? "var(--green)" : agent ? cssColor(ROLE_COLOR[agent.role]) : "var(--grey)";
+    const textColor = isFounder ? "var(--green)" : agent ? lightened(ROLE_COLOR[agent.role]) : "var(--grey)";
+    if (!collapse) {
+      const dot = el("span", "avatar");
+      dot.style.background = color;
+      row.append(dot);
+      const header = el("div", "cmsg-head");
+      const who = el("button", "author", isFounder ? "Founder" : (agent?.name ?? m.from));
+      who.type = "button";
+      who.style.color = textColor;
+      if (agent) {
+        who.title = "Follow this agent";
+        who.addEventListener("click", () => this.actions.selectAgent(agent.id));
+      } else who.disabled = true;
+      header.append(who);
+      header.append(el("span", "role", isFounder ? "You" : agent ? ROLE_LABEL[agent.role] : "unknown"));
+      header.append(el("span", "time", fmtClock(m.timestamp)));
+      row.append(header);
+    } else {
+      const t = el("span", "time hover", fmtClock(m.timestamp));
+      row.append(t);
+    }
+    const text = el("div", "cmsg-text", m.text);
+    text.title = fmtTime(m.timestamp);
+    row.append(text);
+    return row;
   }
 
   private renderFeed(): void {

@@ -3,7 +3,7 @@ role: pm
 kind: core
 model: sonnet
 effort: medium
-tools: [mcp__tokenvalley__send_message, mcp__tokenvalley__create_task, mcp__tokenvalley__update_task, mcp__tokenvalley__read_board, mcp__tokenvalley__handoff, mcp__tokenvalley__call_meeting, mcp__tokenvalley__hire, Read, Glob, Grep, Write]
+tools: [mcp__tokenvalley__send_message, mcp__tokenvalley__post, mcp__tokenvalley__create_task, mcp__tokenvalley__update_task, mcp__tokenvalley__read_board, mcp__tokenvalley__handoff, mcp__tokenvalley__call_meeting, mcp__tokenvalley__hire, Read, Glob, Grep, Write]
 home: pm_desk
 ---
 

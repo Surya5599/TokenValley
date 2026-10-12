@@ -1,4 +1,4 @@
-import type { Agent, Approval, Company, Event, ServerMessage, Task } from "@tokenvalley/shared";
+import type { Agent, Approval, ChatPost, Company, Event, ServerMessage, Task } from "@tokenvalley/shared";
 import type { ConnStatus } from "../net/ws";
 
 /** Derived building status shown on the valley map. */
@@ -8,6 +8,49 @@ export type CameraMode = "valley" | "office" | "follow" | "meeting" | "firstpers
 
 const FEED_LIMIT = 50;
 const FOUNDER_THREAD_LIMIT = 20;
+const POST_LIMIT = 200;
+const DM_LIMIT = 200;
+
+export type PanelTab = "company" | "chat";
+
+/** A channel announced by channel_opened ("general" is implicit and always present). */
+export interface ChannelInfo {
+  channel: string;
+  title: string;
+  memberIds: string[];
+}
+
+/** One agent-to-agent send_message, kept so DM threads can be derived. */
+export interface DmMessage {
+  id: string;
+  from: string;
+  to: string;
+  text: string;
+  timestamp: number;
+}
+
+/** A derived 1:1 thread between two agents. */
+export interface DmThread {
+  /** "dm:<a>|<b>" with the ids sorted, stable across renders. */
+  key: string;
+  a: string;
+  b: string;
+  messages: DmMessage[];
+  lastTimestamp: number;
+}
+
+/** A message of any chat channel, in the shape the chat view renders. */
+export interface ChatLine {
+  id: string;
+  from: string;
+  text: string;
+  timestamp: number;
+}
+
+/** Channel list keys used by the chat view. */
+export const CHANNEL_GENERAL = "general";
+export const CHANNEL_FOUNDER = "founder";
+export const dmKey = (x: string, y: string): string => `dm:${[x, y].sort().join("|")}`;
 
 /** The founder is not an agent; this id marks messages to/from them. */
 export const FOUNDER_ID = "founder";
@@ -38,9 +81,20 @@ export class Store {
   readonly meetings = new Map<string, string[]>();
   /** Founder <-> CEO thread per company (last FOUNDER_THREAD_LIMIT), oldest first. */
   readonly founderThreads = new Map<string, FounderMessage[]>();
+  /** Channel posts per company (last POST_LIMIT), oldest first. */
+  readonly posts = new Map<string, ChatPost[]>();
+  /** Channels opened per company, in the order they were opened. */
+  readonly channels = new Map<string, ChannelInfo[]>();
+  /** Agent-to-agent messages per company (last DM_LIMIT), oldest first. */
+  readonly dms = new Map<string, DmMessage[]>();
+  /** Chat UI: last-viewed message timestamp per "<companyId>:<channelKey>". In memory only. */
+  readonly chatLastViewed = new Map<string, number>();
+  /** Chat UI: the open channel key per company. */
+  readonly chatChannel = new Map<string, string>();
 
   focusedCompanyId: string | null = null;
   selectedAgentId: string | null = null;
+  panelTab: PanelTab = "company";
   cameraMode: CameraMode = "valley";
   speed = 1;
   connection: ConnStatus = "disconnected";
@@ -84,6 +138,59 @@ export class Store {
     return this.founderThreads.get(companyId) ?? [];
   }
 
+  postsOf(companyId: string): ChatPost[] {
+    return this.posts.get(companyId) ?? [];
+  }
+
+  channelsOf(companyId: string): ChannelInfo[] {
+    return this.channels.get(companyId) ?? [];
+  }
+
+  dmsOf(companyId: string): DmMessage[] {
+    return this.dms.get(companyId) ?? [];
+  }
+
+  /** One thread per agent pair that exchanged messages, most recent first. */
+  dmThreadsOf(companyId: string): DmThread[] {
+    const threads = new Map<string, DmThread>();
+    for (const m of this.dmsOf(companyId)) {
+      const key = dmKey(m.from, m.to);
+      let t = threads.get(key);
+      if (!t) {
+        const pair = [m.from, m.to].sort();
+        t = { key, a: pair[0] ?? m.from, b: pair[1] ?? m.to, messages: [], lastTimestamp: 0 };
+        threads.set(key, t);
+      }
+      t.messages.push(m);
+      t.lastTimestamp = Math.max(t.lastTimestamp, m.timestamp);
+    }
+    return [...threads.values()].sort((x, y) => y.lastTimestamp - x.lastTimestamp);
+  }
+
+  /** Messages of a chat channel key as a uniform list, oldest first. */
+  channelMessagesOf(companyId: string, key: string): ChatLine[] {
+    if (key === CHANNEL_FOUNDER) return this.founderThreadOf(companyId);
+    if (key.startsWith("dm:")) return this.dmThreadsOf(companyId).find((t) => t.key === key)?.messages ?? [];
+    return this.postsOf(companyId).filter((p) => p.channel === key);
+  }
+
+  /** Messages newer than the last time the founder looked at that channel. */
+  unreadCount(companyId: string, key: string): number {
+    const seen = this.chatLastViewed.get(`${companyId}:${key}`);
+    const msgs = this.channelMessagesOf(companyId, key);
+    if (seen === undefined) return msgs.length;
+    let n = 0;
+    for (const m of msgs) if (m.timestamp > seen) n++;
+    return n;
+  }
+
+  /** Marks every current message of a channel as seen. */
+  markChannelViewed(companyId: string, key: string): void {
+    let last = this.chatLastViewed.get(`${companyId}:${key}`) ?? 0;
+    for (const m of this.channelMessagesOf(companyId, key)) if (m.timestamp > last) last = m.timestamp;
+    this.chatLastViewed.set(`${companyId}:${key}`, last);
+  }
+
   focusedCompany(): Company | null {
     return this.focusedCompanyId ? (this.companies.get(this.focusedCompanyId) ?? null) : null;
   }
@@ -110,6 +217,9 @@ export class Store {
     this.approvals.clear();
     this.meetings.clear();
     this.founderThreads.clear();
+    this.posts.clear();
+    this.channels.clear();
+    this.dms.clear();
     for (const c of msg.companies) this.companies.set(c.id, c);
     for (const a of msg.agents) this.agents.set(a.id, a);
     for (const t of msg.tasks) this.tasks.set(t.id, t);
@@ -218,8 +328,48 @@ export class Store {
           }
           thread.push({ id: e.message.id, from: e.agentId, text: e.message.text, timestamp: e.timestamp });
           if (thread.length > FOUNDER_THREAD_LIMIT) thread.splice(0, thread.length - FOUNDER_THREAD_LIMIT);
+        } else {
+          let list = this.dms.get(e.companyId);
+          if (!list) {
+            list = [];
+            this.dms.set(e.companyId, list);
+          }
+          list.push({ id: e.message.id, from: e.agentId, to: e.toAgentId, text: e.message.text, timestamp: e.timestamp });
+          if (list.length > DM_LIMIT) list.splice(0, list.length - DM_LIMIT);
         }
         break;
+      case "post_message": {
+        let list = this.posts.get(e.companyId);
+        if (!list) {
+          list = [];
+          this.posts.set(e.companyId, list);
+        }
+        list.push(e.post);
+        if (list.length > POST_LIMIT) list.splice(0, list.length - POST_LIMIT);
+        break;
+      }
+      case "channel_opened": {
+        let list = this.channels.get(e.companyId);
+        if (!list) {
+          list = [];
+          this.channels.set(e.companyId, list);
+        }
+        const existing = list.find((c) => c.channel === e.channel);
+        if (existing) {
+          existing.title = e.title;
+          existing.memberIds = [...e.memberIds];
+        } else list.push({ channel: e.channel, title: e.title, memberIds: [...e.memberIds] });
+        break;
+      }
+      case "agent_persona_changed": {
+        const a = this.agents.get(e.agentId);
+        if (a) {
+          a.name = e.name;
+          a.style = e.style;
+          a.job = e.job;
+        }
+        break;
+      }
       case "handoff": {
         const t = this.tasks.get(e.taskId);
         const to = this.agents.get(e.toAgentId);

@@ -3,7 +3,7 @@ role: qa
 kind: core
 model: sonnet
 effort: medium
-tools: [mcp__tokenvalley__send_message, mcp__tokenvalley__create_task, mcp__tokenvalley__update_task, mcp__tokenvalley__read_board, mcp__tokenvalley__handoff, Read, Glob, Grep, Bash]
+tools: [mcp__tokenvalley__send_message, mcp__tokenvalley__post, mcp__tokenvalley__create_task, mcp__tokenvalley__update_task, mcp__tokenvalley__read_board, mcp__tokenvalley__handoff, Read, Glob, Grep, Bash]
 home: qa_bench
 ---
 

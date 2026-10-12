@@ -147,6 +147,8 @@ export class FakeGenerator {
         currentTaskId: null,
         home: ROLE_HOME[role],
         parentAgentId: null,
+        style: "",
+        job: "",
       };
       this.town.emit({ ...this.base(id), agentId: agent.id, type: "agent_spawned", agent });
     }
@@ -286,7 +288,7 @@ export class FakeGenerator {
     if (roll < 0.955 && (agent.role === "engineer" || agent.role === "backend" || agent.role === "frontend")) {
       const contractor: Agent = {
         id: this.town.nextId("ctr"), companyId: cid, role: "intern", kind: "contractor", name: "Subagent", model: "haiku", effort: "low",
-        status: "working", currentTaskId: mine?.id ?? null, home: agent.home, parentAgentId: agent.id,
+        status: "working", currentTaskId: mine?.id ?? null, home: agent.home, parentAgentId: agent.id, style: "", job: "",
       };
       this.town.emit({ ...this.base(cid), agentId: agent.id, type: "subagent_spawned", contractor });
       setTimeout(() => this.town.emit({ ...this.base(cid), agentId: agent.id, type: "subagent_finished", contractorId: contractor.id }), 6000);
@@ -304,7 +306,7 @@ export class FakeGenerator {
     if (roll < 0.993 && (agent.role === "pm" || agent.role === "ceo")) {
       const hire: Agent = {
         id: this.town.nextId("ag"), companyId: cid, role: pick(["intern", "marketing", "legal", "backend"] as const), kind: "hire", name: "", model: "haiku", effort: "low",
-        status: "idle", currentTaskId: null, home: "floating_2", parentAgentId: null,
+        status: "idle", currentTaskId: null, home: "floating_2", parentAgentId: null, style: "", job: "",
       };
       hire.name = `New hire (${ROLE_LABEL[hire.role]})`;
       hire.home = ROLE_HOME[hire.role];

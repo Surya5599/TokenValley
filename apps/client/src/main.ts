@@ -204,6 +204,18 @@ function bootstrap(): void {
     sendFounderMessage: (companyId, text) => {
       ws?.send({ kind: "founder_message", companyId, text });
     },
+    setAgentPersona: (agentId, name, style, job) => {
+      const agent = store.agents.get(agentId);
+      if (ws) {
+        ws.send({ kind: "set_agent_persona", agentId, name, style, job });
+      } else if (agent) {
+        // Demo: apply locally by synthesising the event the server would send.
+        handleMessage({
+          kind: "event",
+          event: { id: `local-${Date.now()}`, companyId: agent.companyId, timestamp: Date.now(), type: "agent_persona_changed", agentId, name, style, job },
+        });
+      }
+    },
   });
 
   /** Opens the approval dialog if the focused company has one pending. */
@@ -232,6 +244,7 @@ function bootstrap(): void {
         applyVisibility();
         if (m.event.type === "request_approval" && m.event.companyId === store.focusedCompanyId) overlay.openApproval(m.event.approval.id);
         if (m.event.type === "approval_resolved") overlay.closeApproval(m.event.approval.id);
+        if (m.event.type === "agent_persona_changed") overlay.closePersona(m.event.agentId);
         break;
       case "focus_changed":
         focusCompany(m.companyId, false);
@@ -293,6 +306,7 @@ function bootstrap(): void {
         break;
       case "Escape":
         if (overlay.isModalOpen()) overlay.closeFoundModal();
+        else if (overlay.isPersonaOpen()) overlay.closePersona();
         else if (overlay.isApprovalOpen()) overlay.closeApproval();
         else if (store.cameraMode === "firstperson") setCamera(fpContext === "valley" ? "valley" : "office");
         else setCamera(store.focusedCompanyId ? "office" : "valley");

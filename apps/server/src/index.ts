@@ -8,7 +8,8 @@ import { foundCompany } from "./company/founder.js";
 import { watchCompanyFiles, writeConversationFile, writeStatusFile } from "./company/files.js";
 import { runAgentTurn } from "./agent/turn.js";
 import { Scheduler } from "./scheduler.js";
-import { REPO_ROOT } from "./roles.js";
+import { REPO_ROOT, savePersona } from "./roles.js";
+import { mkdirSync, writeFileSync, existsSync } from "node:fs";
 
 const PORT = Number(process.env.TOKENVALLEY_PORT ?? 8787);
 /** "fake" adds three demo companies driven by templates. "live" shows only real companies. */
@@ -57,6 +58,21 @@ function describe(e: Event): string {
   }
 }
 
+function writeChatFiles(rec: CompanyRecord): void {
+  const dir = join(REPO_ROOT, "companies", rec.company.slug, "chat");
+  if (!existsSync(join(dir, ".."))) return;
+  mkdirSync(dir, { recursive: true });
+  const name = (id: string) => (id === "founder" ? "Founder" : town.agents.get(id)?.name ?? id);
+  const stamp = (t: number) => new Date(t).toISOString().slice(11, 19);
+  const posts = town.events.filter((x): x is Extract<Event, { type: "post_message" }> => x.type === "post_message" && x.companyId === rec.company.id);
+  const channels = ["general", ...rec.channels.map((c) => c.channel)];
+  for (const ch of channels) {
+    const title = ch === "general" ? "#general" : `#${ch}: ${rec.channels.find((c) => c.channel === ch)?.title ?? ""}`;
+    const lines = posts.filter((p) => p.post.channel === ch).map((p) => `**${stamp(p.timestamp)} ${name(p.agentId)}:** ${p.post.text}\n`);
+    writeFileSync(join(dir, `${ch}.md`), [`# ${rec.company.name} ${title}`, ``, ...lines, ``].join("\n"));
+  }
+}
+
 // Track approvals and keep each live company's status.md fresh.
 town.onMessage((m) => {
   if (m.kind !== "event") return;
@@ -68,6 +84,7 @@ town.onMessage((m) => {
     const lines = town.events.filter((x) => x.companyId === e.companyId).map(describe).filter(Boolean).slice(-25);
     writeStatusFile(rec.company.slug, rec.company, lines);
   }
+  if (e.type === "post_message" || e.type === "channel_opened") writeChatFiles(rec);
   if (e.type === "send_message" || e.type === "handoff" || e.type === "call_meeting" || e.type === "request_approval" || e.type === "approval_resolved") {
     const name = (id: string) => (id === "founder" ? "Founder" : town.agents.get(id)?.name ?? id);
     const stamp = (t: number) => new Date(t).toISOString().slice(11, 19);
@@ -103,6 +120,7 @@ async function kickoff(rec: CompanyRecord): Promise<void> {
         "2. Send the founder a one-line acknowledgement using send_message with to=\"founder\".",
         "3. Create three to six goal tasks on the board with create_task, assigning owner roles from your colleagues.",
         "4. Send the PM one line asking them to break the goals into tasks and get people moving.",
+        "5. Post a one-line kickoff in #general so the whole company hears it, in character.",
         "Then stop.",
       ].join("\n"),
     });
@@ -180,6 +198,22 @@ wss.on("connection", (ws: WebSocket) => {
         if (shipped) {
           const rec = records.get(approval.companyId);
           if (rec) registry.save(rec);
+        }
+        break;
+      }
+      case "set_agent_persona": {
+        const agent = town.agents.get(msg.agentId);
+        const rec = agent ? records.get(agent.companyId) : undefined;
+        if (!agent || !rec) {
+          send({ kind: "error", message: "Only agents of a live company can be edited." });
+          break;
+        }
+        try {
+          savePersona(rec.company.slug, agent.role, { name: msg.name, style: msg.style, job: msg.job });
+          town.emit({ ...ev(rec.company.id), type: "agent_persona_changed", agentId: agent.id, name: msg.name, style: msg.style, job: msg.job });
+          registry.save(rec);
+        } catch (err) {
+          send({ kind: "error", message: err instanceof Error ? err.message : String(err) });
         }
         break;
       }

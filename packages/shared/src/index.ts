@@ -137,8 +137,23 @@ export const Agent = z.object({
   home: z.string(),
   /** For contractors: the agent that spawned them. */
   parentAgentId: z.string().nullable().default(null),
+  /** Persona: the comedic style block and the job block, editable per company. */
+  style: z.string().default(""),
+  job: z.string().default(""),
 });
 export type Agent = z.infer<typeof Agent>;
+
+/** A message posted to a channel everyone in it can read. */
+export const ChatPost = z.object({
+  id: z.string(),
+  companyId: z.string(),
+  /** "general", or "meeting-<n>" for a meeting thread. */
+  channel: z.string(),
+  from: z.string(),
+  text: z.string(),
+  timestamp: z.number(),
+});
+export type ChatPost = z.infer<typeof ChatPost>;
 
 export const TaskStatus = z.enum(["backlog", "in_progress", "blocked", "review", "done"]);
 export type TaskStatus = z.infer<typeof TaskStatus>;
@@ -207,6 +222,9 @@ export const Event = z.discriminatedUnion("type", [
   z.object({ ...agentBase, type: z.literal("tool_write_file"), path: z.string() }),
   z.object({ ...agentBase, type: z.literal("tool_shell"), command: z.string() }),
   z.object({ ...agentBase, type: z.literal("send_message"), message: Message, toAgentId: z.string() }),
+  z.object({ ...agentBase, type: z.literal("post_message"), post: ChatPost }),
+  z.object({ ...base, type: z.literal("channel_opened"), channel: z.string(), title: z.string(), memberIds: z.array(z.string()) }),
+  z.object({ ...agentBase, type: z.literal("agent_persona_changed"), name: z.string(), style: z.string(), job: z.string() }),
   z.object({ ...agentBase, type: z.literal("handoff"), taskId: z.string(), toAgentId: z.string(), note: z.string() }),
   z.object({ ...agentBase, type: z.literal("call_meeting"), meetingId: z.string(), attendeeIds: z.array(z.string()), topic: z.string() }),
   z.object({ ...base, type: z.literal("meeting_ended"), meetingId: z.string() }),
@@ -272,6 +290,8 @@ export const ClientMessage = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("resolve_approval"), approvalId: z.string(), status: ApprovalStatus, comment: z.string().nullable() }),
   /** The founder talks to the CEO. The CEO is the only agent who hears the founder. */
   z.object({ kind: z.literal("founder_message"), companyId: z.string(), text: z.string().min(1).max(2000) }),
+  /** Edit an agent's persona. Written to companies/<slug>/agents/<role>.md and used from the next turn. */
+  z.object({ kind: z.literal("set_agent_persona"), agentId: z.string(), name: z.string().min(1).max(60), style: z.string().max(2000), job: z.string().max(4000) }),
   z.object({ kind: z.literal("pause_company"), companyId: z.string() }),
   z.object({ kind: z.literal("resume_company"), companyId: z.string() }),
   z.object({ kind: z.literal("panic") }),

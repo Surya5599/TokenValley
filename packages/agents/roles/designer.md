@@ -3,7 +3,7 @@ role: designer
 kind: core
 model: sonnet
 effort: medium
-tools: [mcp__tokenvalley__send_message, mcp__tokenvalley__update_task, mcp__tokenvalley__read_board, mcp__tokenvalley__handoff, Read, Glob, Grep, Write]
+tools: [mcp__tokenvalley__send_message, mcp__tokenvalley__post, mcp__tokenvalley__update_task, mcp__tokenvalley__read_board, mcp__tokenvalley__handoff, Read, Glob, Grep, Write]
 home: design_corner
 ---
 

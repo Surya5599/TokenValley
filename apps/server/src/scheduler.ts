@@ -77,12 +77,26 @@ export class Scheduler {
       const list = this.inbox.get(e.toAgentId) ?? [];
       list.push({ id: e.id, companyId: e.companyId, from: e.agentId, to: e.toAgentId, text: `Handoff of task ${e.taskId}: ${e.note}`, taskId: e.taskId, timestamp: e.timestamp });
       this.inbox.set(e.toAgentId, list);
+    } else if (e.type === "post_message") {
+      const rec = this.records.get(e.companyId);
+      if (!rec) return;
+      const members = e.post.channel === "general"
+        ? rec.agents.filter((a) => a.kind !== "npc" && a.status !== "retired").map((a) => a.id)
+        : rec.channels.find((c) => c.channel === e.post.channel)?.memberIds ?? [];
+      const from = rec.agents.find((a) => a.id === e.agentId)?.name ?? e.agentId;
+      for (const id of members) {
+        if (id === e.agentId) continue;
+        const list = this.inbox.get(id) ?? [];
+        list.push({ id: `${e.id}_${id}`, companyId: e.companyId, from: e.agentId, to: id, text: `[#${e.post.channel}] ${from}: ${e.post.text}`, taskId: null, timestamp: e.timestamp });
+        this.inbox.set(id, list);
+      }
     } else if (e.type === "call_meeting") {
       const caller = this.records.get(e.companyId)?.agents.find((a) => a.id === e.agentId);
       for (const id of e.attendeeIds) {
         if (id === e.agentId) continue;
         const list = this.inbox.get(id) ?? [];
-        list.push({ id: `${e.id}_${id}`, companyId: e.companyId, from: e.agentId, to: id, text: `Meeting called by ${caller?.name ?? "a colleague"}: "${e.topic}". Give your one-line position.`, taskId: null, timestamp: e.timestamp });
+        const channel = this.records.get(e.companyId)?.channels.find((c) => c.title === e.topic && c.memberIds.includes(id))?.channel ?? "general";
+        list.push({ id: `${e.id}_${id}`, companyId: e.companyId, from: e.agentId, to: id, text: `Meeting called by ${caller?.name ?? "a colleague"}: "${e.topic}". Post your position in #${channel} so everyone hears it.`, taskId: null, timestamp: e.timestamp });
         this.inbox.set(id, list);
       }
     } else if (e.type === "approval_resolved") {
@@ -166,7 +180,7 @@ export class Scheduler {
       lines.push("");
     }
     lines.push("## What to do this turn");
-    lines.push("Reply to anything that needs a reply (one short message each, in character).");
+    lines.push("Reply to anything that needs a reply (one short message each, in character). Replies to a [#channel] line go back to that channel with post; replies to a person go with send_message.");
     if (myTasks.length) {
       lines.push("Then make real progress on ONE of your tasks. Mark it in_progress with update_task when you start, and done with update_task when it is finished and verified.");
       lines.push("If you finish, hand it to the right colleague with handoff (engineers hand to qa, qa hands bugs to the engineer).");

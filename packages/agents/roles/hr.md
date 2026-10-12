@@ -3,7 +3,7 @@ role: hr
 kind: hire
 model: haiku
 effort: low
-tools: [mcp__tokenvalley__send_message, mcp__tokenvalley__read_board, mcp__tokenvalley__call_meeting, Read, Glob, Grep]
+tools: [mcp__tokenvalley__send_message, mcp__tokenvalley__post, mcp__tokenvalley__read_board, mcp__tokenvalley__call_meeting, Read, Glob, Grep]
 home: floating_3
 ---
 
