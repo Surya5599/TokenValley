@@ -125,45 +125,285 @@ button.active {
   border-color: transparent;
 }
 
-/* ---- top bar ---- */
+/* ---- menu bar ---- */
 
 .topbar {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 48px;
+  height: 40px;
+  z-index: 20;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 14px;
+  gap: 6px;
+  padding: 0 10px 0 14px;
   background: var(--panel);
   border-bottom: 1px solid var(--panel-border);
   backdrop-filter: blur(6px);
+  white-space: nowrap;
 }
 
 .brand {
   font-weight: 700;
-  font-size: 16px;
+  font-size: 15px;
   letter-spacing: 0.02em;
   white-space: nowrap;
+  margin-right: 8px;
+  flex: none;
 }
 
-.tabs {
+.menus {
   display: flex;
-  gap: 8px;
-  overflow-x: auto;
+  align-items: center;
+  gap: 2px;
+  height: 100%;
+  min-width: 0;
   flex: 0 1 auto;
+}
+
+.menu {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: center;
   min-width: 0;
 }
 
-.tab {
-  display: flex;
+.menu-btn {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  font-size: 14px;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  background: transparent;
+  border-color: transparent;
+  font-size: 13px;
+  max-width: 240px;
+  min-width: 0;
+}
+
+.menu-btn:hover,
+.menu.open > .menu-btn {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.menu-btn:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.menu-btn .label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.menu-btn .label .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 600;
+}
+
+.menu-btn .caret {
+  font-size: 10px;
+  color: var(--muted);
+  flex: none;
+}
+
+.menu-btn .count,
+.bell .count {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: #0b0e14;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  flex: none;
+}
+
+.menu-btn .count.show,
+.bell.show .count {
+  display: inline-flex;
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% - 5px);
+  left: 0;
+  min-width: 290px;
+  max-width: 420px;
+  padding: 4px;
+  background: var(--panel-solid);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  display: none;
+}
+
+.menu.open > .dropdown {
+  display: block;
+}
+
+.mi {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mi:hover:not(:disabled),
+.mi:focus-visible {
+  background: rgba(124, 196, 255, 0.18);
+  outline: none;
+}
+
+.mi:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.mi .check {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.mi .dot {
+  justify-self: center;
+}
+
+.mi-text {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.mi-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mi-sub {
+  color: var(--muted);
+  font-size: 11px;
+  flex: none;
+}
+
+.mi-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.mi-right:empty {
+  display: none;
+}
+
+.mi-right .badge.live {
+  margin-left: 0;
+}
+
+.mi kbd {
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  padding: 0 5px;
+  min-width: 16px;
+  text-align: center;
+}
+
+.mi.danger {
+  color: #ff8d96;
+}
+
+.mi.danger:hover:not(:disabled),
+.mi.danger:focus-visible {
+  background: rgba(230, 57, 70, 0.2);
+}
+
+.mi.armed {
+  background: rgba(230, 57, 70, 0.28);
+  font-weight: 600;
+}
+
+.mdiv {
+  height: 1px;
+  background: var(--rule);
+  margin: 4px 6px;
+}
+
+.mhead {
+  padding: 5px 8px 2px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+.needs {
+  color: var(--yellow);
+  font-weight: 600;
+  font-size: 11px;
+}
+
+@keyframes bell-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 214, 10, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(255, 214, 10, 0);
+  }
+}
+
+.bell {
+  display: none;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 9px;
+  color: var(--yellow);
+  background: rgba(255, 214, 10, 0.14);
+  border-color: rgba(255, 214, 10, 0.5);
+  border-radius: 999px;
+  animation: bell-pulse 1.6s ease-out infinite;
+  flex: none;
+}
+
+.bell.show {
+  display: inline-flex;
+}
+
+.bell:hover {
+  background: rgba(255, 214, 10, 0.26);
 }
 
 .dot {
@@ -197,45 +437,6 @@ button.active {
   flex: 1;
 }
 
-.tray {
-  display: flex;
-  gap: 8px;
-}
-
-.tray .pill {
-  background: rgba(255, 214, 10, 0.18);
-  border: 1px solid var(--yellow);
-  color: var(--yellow);
-  border-radius: 999px;
-  padding: 3px 12px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.controls {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 10px;
-  border: 1px solid var(--panel-border);
-  border-radius: var(--radius);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.group {
-  display: flex;
-  gap: 4px;
-}
-
-.group.speeds {
-  padding-left: 10px;
-  border-left: 1px solid var(--panel-border);
-}
-
-.group button {
-  padding: 3px 8px;
-}
-
 .conn {
   border-radius: 999px;
   padding: 3px 12px;
@@ -243,6 +444,7 @@ button.active {
   font-size: 12px;
   border: 1px solid transparent;
   white-space: nowrap;
+  flex: none;
 }
 
 .conn.connected {
@@ -270,10 +472,10 @@ button.active {
 
 .panel {
   position: absolute;
-  top: 58px;
+  top: 50px;
   right: 10px;
   width: var(--panel-w);
-  max-height: calc(100% - 68px);
+  max-height: calc(100% - 60px);
   overflow-y: auto;
   overflow-x: hidden;
   background: var(--panel);
@@ -654,31 +856,54 @@ button.icon:hover {
   color: var(--green);
 }
 
-/* ---- hints ---- */
+/* ---- info modal (Help menu) ---- */
 
-.hint {
-  position: absolute;
-  left: 500px;
-  right: calc(var(--panel-w) + 20px);
-  bottom: 10px;
-  width: max-content;
-  max-width: calc(100% - 520px - var(--panel-w));
-  margin-left: auto;
-  text-align: right;
-  line-height: 1.6;
-  color: var(--muted);
-  font-size: 11px;
-  background: var(--panel);
-  border: 1px solid var(--panel-border);
-  border-radius: var(--radius);
-  padding: 6px 10px;
+.modal.info {
+  width: 460px;
 }
 
-.hint kbd {
+.shortcuts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 14px;
+  row-gap: 7px;
+  align-items: baseline;
+  margin-top: 4px;
+}
+
+.shortcuts .keys {
+  display: inline-flex;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.shortcuts kbd {
   font-family: inherit;
+  font-size: 12px;
   background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--panel-border);
   border-radius: 3px;
-  padding: 0 4px;
+  padding: 0 6px;
+  min-width: 22px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.shortcuts .what {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.modal p.about {
+  margin: 0 0 8px;
+  line-height: 1.5;
+}
+
+.modal p.about code {
+  font-size: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+  padding: 1px 5px;
 }
 
 .empty {
@@ -746,6 +971,7 @@ body.firstperson .fp-hint {
 .modal-backdrop {
   position: absolute;
   inset: 0;
+  z-index: 40;
   background: rgba(0, 0, 0, 0.55);
   display: none;
   align-items: center;
@@ -862,20 +1088,6 @@ button:disabled {
 }
 
 /* ---- approvals ---- */
-
-@keyframes tray-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(255, 214, 10, 0.55);
-  }
-  50% {
-    box-shadow: 0 0 0 6px rgba(255, 214, 10, 0);
-  }
-}
-
-.tray .pill.pulse {
-  animation: tray-pulse 1.6s ease-out infinite;
-}
 
 .modal.approval .summary {
   margin-top: 10px;
@@ -1030,7 +1242,7 @@ button.danger {
 
 .panel.chat {
   width: var(--panel-w);
-  height: calc(100% - 68px);
+  height: calc(100% - 60px);
   display: flex;
   flex-direction: column;
   overflow: hidden;

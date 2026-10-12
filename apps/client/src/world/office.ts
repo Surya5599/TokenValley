@@ -1,6 +1,9 @@
 import * as THREE from "three";
 import { HOME_SPOTS, OFFICE_DEPTH, OFFICE_ROOMS, OFFICE_WIDTH, type Palette, type Room } from "@tokenvalley/shared";
 import { isWalkable, reachableFrom, type ObstacleGrid, type Tile } from "./pathfinding";
+import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { PASTEL, floorTileTexture, hex, pastel, toonMat } from "./style";
 import { canvasTexture, makeCanvas, wrapText } from "./textures";
 
 export type { Tile } from "./pathfinding";
@@ -22,8 +25,8 @@ const SEAT_H = 0.42;
 const DESK_H = 0.8;
 const ROOM_WALL_H = 1.3;
 
-function lambert(color: THREE.ColorRepresentation): THREE.MeshLambertMaterial {
-  return new THREE.MeshLambertMaterial({ color });
+function solid(color: THREE.ColorRepresentation): THREE.MeshToonMaterial {
+  return toonMat(color);
 }
 
 type Canvas = { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; tex: THREE.CanvasTexture };
@@ -51,7 +54,7 @@ export class Office {
 
   private readonly materials: THREE.Material[] = [];
   private readonly geometries: THREE.BufferGeometry[] = [];
-  private readonly monitors = new Map<string, { mat: THREE.MeshLambertMaterial; until: number }>();
+  private readonly monitors = new Map<string, { mat: THREE.MeshToonMaterial; until: number }>();
   private readonly rackLeds: THREE.MeshBasicMaterial[] = [];
   private alarmLight: THREE.PointLight | null = null;
   private alarmMat: THREE.MeshBasicMaterial | null = null;
@@ -59,6 +62,7 @@ export class Office {
   private bell: THREE.Group | null = null;
   private bellRingUntil = 0;
   private signCanvas: Canvas | null = null;
+  private floorTex: THREE.Texture | null = null;
   private boardCanvas: Canvas | null = null;
   private incidentDays = -1;
   private taskTitles: string[] = [];
@@ -73,6 +77,10 @@ export class Office {
   private readonly plantMat: THREE.Material;
   private readonly potMat: THREE.Material;
   private readonly metalMat: THREE.Material;
+  private readonly chairMat: THREE.Material;
+  private readonly skirtMat: THREE.Material;
+  /** Skirting boxes collected per wall run and merged into one mesh. */
+  private readonly skirtings: THREE.BufferGeometry[] = [];
 
   constructor(
     readonly palette: Palette,
@@ -83,18 +91,22 @@ export class Office {
     this.bellSpot = spotTile("bell") ?? this.entranceSpot;
     this.closetSpot = spotTile("server_closet") ?? this.entranceSpot;
 
-    this.deskMat = lambert(palette.secondary);
-    this.accentMat = lambert(palette.accent);
-    this.darkMat = lambert(0x2f3542);
-    this.woodMat = lambert(0x9c6b3c);
-    this.whiteMat = lambert(0xf1f2f6);
-    this.plantMat = lambert(0x2ecc71);
-    this.potMat = lambert(0x8e5a3a);
-    this.metalMat = lambert(0x9aa5b1);
-    this.materials.push(this.deskMat, this.accentMat, this.darkMat, this.woodMat, this.whiteMat, this.plantMat, this.potMat, this.metalMat);
+    // Pastel set: peach wood desks, dusty-blue chairs, teal plants, lavender-grey metal.
+    this.deskMat = solid(0xe8c39e);
+    this.accentMat = solid(pastel(palette.accent, 0.25));
+    this.darkMat = solid(0x5c6b8a);
+    this.woodMat = solid(0xe8c39e);
+    this.whiteMat = solid(PASTEL.white);
+    this.plantMat = solid(PASTEL.teal);
+    this.potMat = solid(0xe8a98a);
+    this.metalMat = solid(0xcdc7df);
+    this.chairMat = solid(PASTEL.blue);
+    this.skirtMat = solid(pastel(palette.primary));
+    this.materials.push(this.deskMat, this.accentMat, this.darkMat, this.woodMat, this.whiteMat, this.plantMat, this.potMat, this.metalMat, this.chairMat, this.skirtMat);
 
     this.buildFloorAndPerimeter();
     this.buildRooms();
+    this.commitSkirting();
     for (const room of OFFICE_ROOMS) this.furnishRoom(room);
     this.furnishBullpen();
 
@@ -120,9 +132,9 @@ export class Office {
       const row = Math.floor(i / 2);
       const x = 20 + col * (canvas.width / 2);
       const y = 56 + row * 34;
-      ctx.fillStyle = ["#ffd166", "#ef476f", "#06d6a0", "#118ab2"][i % 4] ?? "#ffd166";
+      ctx.fillStyle = ["#f7d774", "#f28b82", "#9fd8c9", "#6fa3d8"][i % 4] ?? "#f7d774";
       ctx.fillRect(x, y + 4, 14, 14);
-      ctx.fillStyle = "#1e2a3a";
+      ctx.fillStyle = "#3b3a4f";
       const line = wrapText(ctx, t, canvas.width / 2 - 50, 1)[0] ?? "";
       ctx.fillText(line, x + 22, y);
     });
@@ -134,17 +146,17 @@ export class Office {
     if (d === this.incidentDays || !this.signCanvas) return;
     this.incidentDays = d;
     const { ctx, canvas, tex } = this.signCanvas;
-    ctx.fillStyle = "#f8f3e6";
+    ctx.fillStyle = "#fffaf5";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.strokeStyle = "#b03a2e";
+    ctx.strokeStyle = "#f28b82";
     ctx.lineWidth = 10;
     ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
-    ctx.fillStyle = "#333";
+    ctx.fillStyle = "#3b3a4f";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = "bold 30px system-ui, sans-serif";
     ctx.fillText("DAYS WITHOUT INCIDENT", canvas.width / 2, 34);
-    ctx.fillStyle = "#b03a2e";
+    ctx.fillStyle = "#e0533d";
     ctx.font = "bold 72px system-ui, sans-serif";
     ctx.fillText(String(d), canvas.width / 2, 96);
     tex.needsUpdate = true;
@@ -170,7 +182,7 @@ export class Office {
     const t = this.time;
     this.rackLeds.forEach((led, i) => {
       const on = Math.sin(t * (3 + (i % 5)) + i) > 0.3;
-      led.color.setHex(on ? (i % 3 === 0 ? 0xff9f1c : 0x2ec4b6) : 0x1b1b1b);
+      led.color.setHex(on ? (i % 3 === 0 ? 0xf6b79c : 0x9fd8c9) : 0x3b3a4f);
     });
     if (this.alarmMat && this.alarmLight) {
       if (t < this.alarmUntil) {
@@ -183,7 +195,7 @@ export class Office {
       }
     }
     if (this.bell) this.bell.rotation.z = t < this.bellRingUntil ? Math.sin(t * 30) * 0.25 : 0;
-    for (const m of this.monitors.values()) m.mat.emissive.setHex(t < m.until ? 0x1f7a3f : 0x0b2a44);
+    for (const m of this.monitors.values()) m.mat.emissive.setHex(t < m.until ? 0x2fb38a : 0x000000);
   }
 
   dispose(): void {
@@ -191,6 +203,7 @@ export class Office {
     for (const m of this.materials) m.dispose();
     this.signCanvas?.tex.dispose();
     this.boardCanvas?.tex.dispose();
+    this.floorTex?.dispose();
     this.group.removeFromParent();
   }
 
@@ -214,14 +227,16 @@ export class Office {
 
   private buildFloorAndPerimeter(): void {
     const floorGeo = new THREE.PlaneGeometry(W, D);
-    const floorMat = lambert(this.palette.floor);
+    const floorTex = floorTileTexture(W, D);
+    const floorMat = toonMat(0xffffff, { map: floorTex });
+    this.floorTex = floorTex;
     const floor = new THREE.Mesh(floorGeo, floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
     this.track(floorGeo, floorMat);
     this.group.add(floor);
 
-    const wallMat = lambert(this.palette.wall);
+    const wallMat = solid(PASTEL.white);
     this.materials.push(wallMat);
     // Back (north) and left (west) walls are tall; front and right are cut away.
     this.wallBox(0, 0, W - 1, 0, 2.4, wallMat);
@@ -239,7 +254,7 @@ export class Office {
 
   /** Walls for every room with gaps at doors and at HOME_SPOT tiles. */
   private buildRooms(): void {
-    const partMat = lambert(new THREE.Color(this.palette.wall).multiplyScalar(0.92));
+    const partMat = solid(PASTEL.cream);
     this.materials.push(partMat);
     const spotKeys = new Set(Object.values(HOME_SPOTS).map((s) => `${s.x},${s.z}`));
     const doorKeys = new Set<string>();
@@ -334,7 +349,7 @@ export class Office {
 
   private roomLabel(room: Room): void {
     const { canvas, ctx } = makeCanvas(256, 64);
-    ctx.fillStyle = "rgba(0,0,0,0.35)";
+    ctx.fillStyle = "rgba(59, 58, 79, 0.5)";
     ctx.font = "bold 30px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -407,7 +422,7 @@ export class Office {
         this.roundTable(room.x0 + 2, room.z0 + 2);
         this.roundTable(room.x0 + 2, room.z1 - 1);
         this.roundTable(room.x1 - 2, room.z1 - 1);
-        this.makeBoard(room.x0 + 2, room.z0 + 1, room.x0 + 3, room.z0 + 1, "", false, false, 0x0b1020); // TV
+        this.makeBoard(room.x0 + 2, room.z0 + 1, room.x0 + 3, room.z0 + 1, "", false, false, 0x4a5872); // TV
         this.faceTiles.set("break_room", { x: spot.x, z: spot.z - 1 });
         for (const t of [spot, { x: spot.x - 1, z: spot.z }, { x: spot.x, z: spot.z + 1 }, { x: spot.x + 1, z: spot.z }, { x: spot.x - 1, z: spot.z + 1 }]) this.breakSpots.push(t);
         break;
@@ -589,19 +604,53 @@ export class Office {
 
   private wallBox(x0: number, z0: number, x1: number, z1: number, h: number, mat: THREE.Material): void {
     this.box(x0, z0, x1, z1, h, mat, 0, 0.3);
+    // A pastel skirting band around the foot of every wall run.
+    const inset = 0.26;
+    const geo = new THREE.BoxGeometry(x1 - x0 + 1 - inset * 2, 0.14, z1 - z0 + 1 - inset * 2);
+    geo.translate((x0 + x1) / 2 - W / 2 + 0.5, 0.07, (z0 + z1) / 2 - D / 2 + 0.5);
+    this.skirtings.push(geo);
+  }
+
+  private commitSkirting(): void {
+    if (this.skirtings.length === 0) return;
+    const merged = mergeGeometries(this.skirtings, false);
+    for (const g of this.skirtings) g.dispose();
+    this.skirtings.length = 0;
+    if (!merged) return;
+    this.track(merged);
+    const mesh = new THREE.Mesh(merged, this.skirtMat);
+    mesh.receiveShadow = true;
+    this.group.add(mesh);
   }
 
   /** A desk with a monitor on its middle tile; `facing` is the side the user sits on. */
   private desk(x0: number, z0: number, x1: number, z1: number, mat: THREE.Material, spotId: string, facing: "north" | "south" | "east" = "north"): void {
-    this.box(x0, z0, x1, z1, DESK_H, mat);
+    // Rounded top on a slimmer white base so the desk reads as a toy.
+    const inset = 0.08;
+    const w = x1 - x0 + 1 - inset * 2;
+    const d = z1 - z0 + 1 - inset * 2;
+    const topGeo = new RoundedBoxGeometry(w, 0.12, d, 2, 0.05);
+    this.track(topGeo);
+    const top = new THREE.Mesh(topGeo, mat);
+    top.position.set((x0 + x1) / 2 - W / 2 + 0.5, DESK_H - 0.06, (z0 + z1) / 2 - D / 2 + 0.5);
+    top.castShadow = true;
+    top.receiveShadow = true;
+    this.group.add(top);
+    const baseGeo = new THREE.BoxGeometry(w - 0.3, DESK_H - 0.12, d - 0.3);
+    this.track(baseGeo);
+    const pedestal = new THREE.Mesh(baseGeo, this.whiteMat);
+    pedestal.position.set(top.position.x, (DESK_H - 0.12) / 2, top.position.z);
+    pedestal.castShadow = true;
+    this.group.add(pedestal);
+    this.block(x0, z0, x1, z1);
     const mx = Math.floor((x0 + x1) / 2);
     const mz = Math.floor((z0 + z1) / 2);
     const standGeo = new THREE.BoxGeometry(0.1, 0.2, 0.1);
     const screenGeo = new THREE.BoxGeometry(0.7, 0.45, 0.06);
     this.track(standGeo);
     this.track(screenGeo);
-    const stand = new THREE.Mesh(standGeo, this.darkMat);
-    const screenMat = new THREE.MeshLambertMaterial({ color: 0x0f172a, emissive: 0x0b2a44 });
+    const stand = new THREE.Mesh(standGeo, this.whiteMat);
+    const screenMat = toonMat(PASTEL.paleBlue, { emissive: 0x000000 });
     this.materials.push(screenMat);
     const screen = new THREE.Mesh(screenGeo, screenMat);
     const base = tileToWorld({ x: mx, z: mz }, DESK_H);
@@ -622,9 +671,9 @@ export class Office {
     this.track(seatGeo);
     this.track(legGeo);
     const p = tileToWorld({ x, z });
-    const seat = new THREE.Mesh(seatGeo, this.darkMat);
+    const seat = new THREE.Mesh(seatGeo, this.chairMat);
     seat.position.set(p.x, SEAT_H, p.z);
-    const leg = new THREE.Mesh(legGeo, this.darkMat);
+    const leg = new THREE.Mesh(legGeo, this.metalMat);
     leg.position.set(p.x, SEAT_H / 2, p.z);
     this.group.add(seat, leg);
   }
@@ -719,13 +768,13 @@ export class Office {
   }
 
   private drawBoardBase(ctx: CanvasRenderingContext2D, w: number, h: number, title: string): void {
-    ctx.fillStyle = "#f7f7f2";
+    ctx.fillStyle = "#fffaf5";
     ctx.fillRect(0, 0, w, h);
-    ctx.strokeStyle = "#8d99ae";
+    ctx.strokeStyle = "#c9b8e8";
     ctx.lineWidth = 8;
     ctx.strokeRect(4, 4, w - 8, h - 8);
     if (title) {
-      ctx.fillStyle = "#2b2d42";
+      ctx.fillStyle = "#3b3a4f";
       ctx.font = "bold 28px system-ui, sans-serif";
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
@@ -741,7 +790,7 @@ export class Office {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     } else this.drawBoardBase(ctx, canvas.width, canvas.height, title);
     if (stickies) {
-      const colors = ["#ffd166", "#ff8fab", "#9bf6ff", "#caffbf"];
+      const colors = ["#f7d774", "#f5a3c7", "#d6e8ff", "#9fd8c9"];
       for (let i = 0; i < 7; i++) {
         ctx.fillStyle = colors[i % colors.length] ?? "#ffd166";
         ctx.fillRect(40 + i * 62, 80 + (i % 3) * 40, 44, 44);
@@ -753,7 +802,7 @@ export class Office {
     const len = vertical ? z1 - z0 + 1 : x1 - x0 + 1;
     const geo = new THREE.BoxGeometry(vertical ? 0.15 : len - 0.2, 1.1, vertical ? len - 0.2 : 0.15);
     this.track(geo);
-    const frame = lambert(0x6c757d);
+    const frame = solid(PASTEL.lavender);
     this.materials.push(frame);
     // Box material order: +x, -x, +y, -y, +z, -z
     const mats = vertical ? [frame, mat, frame, frame, frame, frame] : [frame, frame, frame, frame, mat, frame];
@@ -771,7 +820,7 @@ export class Office {
     this.materials.push(mat);
     const geo = new THREE.BoxGeometry(x1 - x0 + 1 - 0.3, 1.0, 0.12);
     this.track(geo);
-    const frame = lambert(0x6c757d);
+    const frame = solid(PASTEL.lavender);
     this.materials.push(frame);
     // Faces north (-z), into the room.
     const mesh = new THREE.Mesh(geo, [frame, frame, frame, frame, frame, mat]);
@@ -784,11 +833,9 @@ export class Office {
   /** Company name on the reception back wall, facing into the lobby (+z). */
   private companySign(x0: number, z0: number, x1: number, z1: number): void {
     const { canvas, ctx } = makeCanvas(512, 128);
-    ctx.fillStyle = this.palette.primary;
+    ctx.fillStyle = hex(pastel(this.palette.primary));
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const c = new THREE.Color(this.palette.primary);
-    const lum = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
-    ctx.fillStyle = lum > 0.5 ? "#1b1f2a" : "#ffffff";
+    ctx.fillStyle = hex(PASTEL.ink);
     ctx.font = "bold 48px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -832,7 +879,7 @@ export class Office {
   private coffeeMachine(x: number, z: number): void {
     const geo = new THREE.BoxGeometry(0.5, 0.6, 0.5);
     this.track(geo);
-    const m = new THREE.Mesh(geo, this.darkMat);
+    const m = new THREE.Mesh(geo, this.chairMat);
     m.position.copy(tileToWorld({ x, z }, 0.9 + 0.3));
     this.group.add(m);
     const potGeo = new THREE.CylinderGeometry(0.1, 0.12, 0.2, 8);
@@ -843,7 +890,7 @@ export class Office {
   }
 
   private vending(x: number, z: number): void {
-    this.box(x, z, x, z, 1.9, this.darkMat);
+    this.box(x, z, x, z, 1.9, this.metalMat);
     const g = new THREE.BoxGeometry(0.05, 1.2, 0.6);
     this.track(g);
     const panel = new THREE.Mesh(g, this.accentMat);

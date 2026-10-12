@@ -2,23 +2,25 @@ import * as THREE from "three";
 import type { Agent, AnimState, ModelTier, RoleId } from "@tokenvalley/shared";
 import { spotTile, tileToWorld, type Office, type Tile } from "./office";
 import { findPath, nearestWalkable } from "./pathfinding";
+import { PASTEL, toonMat } from "./style";
 import { canvasTexture, disposeSprite, makeCanvas, roundRect, wrapText } from "./textures";
 
+/** Pastel outfit per role; also used by the overlay for chat avatars. */
 export const ROLE_COLOR: Record<RoleId, number> = {
-  ceo: 0x2b3a67,
-  pm: 0x7b5cb8,
-  engineer: 0x454b57,
-  qa: 0x2a9d8f,
-  designer: 0xe76f51,
-  backend: 0x3a86ff,
-  frontend: 0xff6b9d,
-  marketing: 0xffb703,
-  legal: 0x5a5a5a,
-  hr: 0x8ac926,
-  it: 0x6c757d,
-  intern: 0xa0c4ff,
-  cfo: 0x1d3557,
-  receptionist: 0xf4a261,
+  ceo: PASTEL.blue,
+  pm: PASTEL.peach,
+  engineer: PASTEL.teal,
+  qa: PASTEL.lavender,
+  designer: PASTEL.pink,
+  backend: 0x5b8fd6,
+  frontend: 0x8fbce8,
+  marketing: PASTEL.yellow,
+  legal: PASTEL.greyLavender,
+  hr: PASTEL.rose,
+  it: PASTEL.mint,
+  intern: PASTEL.cream,
+  cfo: PASTEL.sage,
+  receptionist: PASTEL.coral,
 };
 
 const MODEL_BADGE: Record<ModelTier, { label: string; color: string }> = {
@@ -239,7 +241,7 @@ export class Character {
   addPaper(deskTile: Tile | null): void {
     if (!deskTile || this.paperCount >= 12) return;
     const geo = new THREE.BoxGeometry(0.3, 0.025, 0.4);
-    const mat = new THREE.MeshLambertMaterial({ color: 0xfafafa });
+    const mat = toonMat(0xfffdf8);
     this.geometries.push(geo);
     this.materials.push(mat);
     const sheet = new THREE.Mesh(geo, mat);
@@ -471,8 +473,8 @@ export class Character {
 
   // ---- construction ----------------------------------------------------------
 
-  private mat(color: THREE.ColorRepresentation): THREE.MeshLambertMaterial {
-    const m = new THREE.MeshLambertMaterial({ color });
+  private mat(color: THREE.ColorRepresentation): THREE.MeshToonMaterial {
+    const m = toonMat(color);
     this.materials.push(m);
     return m;
   }
@@ -487,10 +489,10 @@ export class Character {
   private buildBody(small: boolean): void {
     const role = this.agent.role;
     const isContractor = this.agent.kind === "contractor";
-    const bodyColor = isContractor ? 0x9aa0a6 : ROLE_COLOR[role];
+    const bodyColor = isContractor ? 0xc3bfd0 : ROLE_COLOR[role];
     const bodyMat = this.mat(bodyColor);
     const skinMat = this.mat(SKIN);
-    const darkMat = this.mat(0x2f3542);
+    const darkMat = this.mat(PASTEL.ink);
 
     // Legs: pivot at the hip, mesh hangs below.
     for (const [grp, x] of [

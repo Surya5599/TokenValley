@@ -7,6 +7,7 @@ import { Overlay } from "./ui/overlay";
 import { CameraRig, type FirstPersonWorld } from "./world/camera";
 import { Director } from "./world/director";
 import { spotTile, tileToWorld } from "./world/office";
+import { skyTexture } from "./world/style";
 import { Valley } from "./world/valley";
 
 const WS_URL = "ws://localhost:8787";
@@ -36,29 +37,43 @@ function bootstrap(): void {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   app.append(renderer.domElement);
 
+  // Pastel toy-city look: pale sky gradient, matching fog, warm soft light.
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x9fd3f5);
-  scene.fog = new THREE.Fog(0x9fd3f5, 90, 220);
+  scene.background = skyTexture();
+  scene.fog = new THREE.Fog(0xf6f2f3, 110, 260);
 
-  const sky = new THREE.HemisphereLight(0xdcecff, 0x5b7a4a, 0.9);
+  const sky = new THREE.HemisphereLight(0xfff4ec, 0xf3c6d3, 1.5);
   scene.add(sky);
-  const sun = new THREE.DirectionalLight(0xfff4e0, 1.6);
+  const ambient = new THREE.AmbientLight(0xffe9f0, 0.7);
+  scene.add(ambient);
+  const sun = new THREE.DirectionalLight(0xfff1e0, 1.9);
   sun.position.set(30, 50, 25);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.camera.left = -45;
-  sun.shadow.camera.right = 45;
-  sun.shadow.camera.top = 45;
-  sun.shadow.camera.bottom = -45;
   sun.shadow.camera.near = 1;
-  sun.shadow.camera.far = 160;
-  sun.shadow.bias = -0.0005;
+  sun.shadow.camera.far = 180;
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.02;
+  sun.shadow.radius = 3;
   scene.add(sun);
+  /** Tight shadow frustum in the office, wide over the whole valley. */
+  const fitShadows = (valleyView: boolean) => {
+    const s = valleyView ? 88 : 26;
+    const cam = sun.shadow.camera;
+    cam.left = -s;
+    cam.right = s;
+    cam.top = valleyView ? 68 : s;
+    cam.bottom = valleyView ? -68 : -s;
+    cam.updateProjectionMatrix();
+  };
+  fitShadows(true);
 
   const valley = new Valley();
   scene.add(valley.group);
   const director = new Director(scene, store, { sun, sky });
   const rig = new CameraRig(window.innerWidth / window.innerHeight);
+  rig.camera.fov = 35;
+  rig.camera.updateProjectionMatrix();
   rig.attach(renderer.domElement);
   rig.followTarget = () => director.characterPosition(store.selectedAgentId);
 
@@ -72,6 +87,7 @@ function bootstrap(): void {
     const mode = store.cameraMode;
     const inValley = mode === "valley" || (mode === "firstperson" && fpContext === "valley");
     valley.group.visible = inValley;
+    fitShadows(inValley);
     director.setVisible(!inValley);
     for (const ch of director.characters.values()) ch.group.visible = !inValley;
     const office = director.office;
@@ -87,6 +103,7 @@ function bootstrap(): void {
   const valleyWorld = (): FirstPersonWorld => ({
     blocked: (x, z) => {
       if (Math.abs(x) > VALLEY_HALF_W || Math.abs(z) > VALLEY_HALF_D) return true;
+      if (valley.blockedAt(x, z)) return true;
       for (const c of store.companies.values()) {
         const p = valley.buildingPosition(c.id);
         if (!p) continue;
@@ -216,7 +233,25 @@ function bootstrap(): void {
         });
       }
     },
+    pauseCompany: (companyId) => {
+      if (ws) ws.send({ kind: "pause_company", companyId });
+      else localPhase(companyId, "paused");
+    },
+    resumeCompany: (companyId) => {
+      if (ws) ws.send({ kind: "resume_company", companyId });
+      else localPhase(companyId, "building");
+    },
+    panic: () => {
+      if (ws) ws.send({ kind: "panic" });
+      else for (const id of store.companies.keys()) localPhase(id, "paused");
+    },
   });
+
+  /** Demo: mirrors the company_phase event the server would emit for pause/resume/panic. */
+  function localPhase(companyId: string, phase: "paused" | "building"): void {
+    if (!store.companies.has(companyId)) return;
+    handleMessage({ kind: "event", event: { id: `local-${Date.now()}-${companyId}`, companyId, timestamp: Date.now(), type: "company_phase", phase } });
+  }
 
   /** Opens the approval dialog if the focused company has one pending. */
   const surfacePendingApproval = () => {
@@ -305,10 +340,9 @@ function bootstrap(): void {
         setCamera("firstperson");
         break;
       case "Escape":
-        if (overlay.isModalOpen()) overlay.closeFoundModal();
-        else if (overlay.isPersonaOpen()) overlay.closePersona();
-        else if (overlay.isApprovalOpen()) overlay.closeApproval();
-        else if (store.cameraMode === "firstperson") setCamera(fpContext === "valley" ? "valley" : "office");
+        // Menus and dialogs first, topmost wins; only then does Esc move the camera.
+        if (overlay.handleEscape()) break;
+        if (store.cameraMode === "firstperson") setCamera(fpContext === "valley" ? "valley" : "office");
         else setCamera(store.focusedCompanyId ? "office" : "valley");
         break;
     }
@@ -335,7 +369,7 @@ function bootstrap(): void {
   requestAnimationFrame(tick);
 
   // Debug hook for driving the client from the console or scripts.
-  (window as unknown as { tokenvalley: unknown }).tokenvalley = { store, rig, director, valley, overlay, setCamera, focusCompany, handleMessage };
+  (window as unknown as { tokenvalley: unknown }).tokenvalley = { store, rig, director, valley, overlay, renderer, setCamera, focusCompany, handleMessage };
 }
 
 bootstrap();

@@ -15,7 +15,7 @@ interface Framing {
 type OrbitMode = Exclude<CameraMode, "firstperson">;
 
 const PRESETS: Record<OrbitMode, Omit<Framing, "target">> = {
-  valley: { radius: 70, elevation: 0.95, azimuth: 0.35 },
+  valley: { radius: 125, elevation: 0.78, azimuth: 0.6 },
   office: { radius: 40, elevation: 0.9, azimuth: 0.62 },
   follow: { radius: 9, elevation: 0.62, azimuth: 0.62 },
   meeting: { radius: 15, elevation: 0.85, azimuth: 0.62 },
@@ -47,8 +47,8 @@ export class CameraRig {
   /** Fired when pointer lock is lost while in first-person (Esc). */
   onPointerUnlock: (() => void) | null = null;
 
-  private readonly current: Framing = { target: new THREE.Vector3(), radius: 70, elevation: 0.95, azimuth: 0.35 };
-  private readonly desired: Framing = { target: new THREE.Vector3(), radius: 70, elevation: 0.95, azimuth: 0.35 };
+  private readonly current: Framing = { target: new THREE.Vector3(), ...PRESETS.valley };
+  private readonly desired: Framing = { target: new THREE.Vector3(), ...PRESETS.valley };
   private dragging = false;
   private lastX = 0;
   private lastY = 0;
@@ -162,7 +162,7 @@ export class CameraRig {
         e.preventDefault();
         if (this.mode === "firstperson") return;
         const f = Math.exp(e.deltaY * 0.0012);
-        this.desired.radius = THREE.MathUtils.clamp(this.desired.radius * f, 4, 140);
+        this.desired.radius = THREE.MathUtils.clamp(this.desired.radius * f, 4, 180);
       },
       { passive: false },
     );

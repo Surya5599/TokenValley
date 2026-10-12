@@ -1,5 +1,5 @@
 import { FoundCompanyInput, ROLE_LABEL, type Company, type Event, type ModelTier, type RoleId, type TaskStatus } from "@tokenvalley/shared";
-import { CHANNEL_FOUNDER, CHANNEL_GENERAL, FOUNDER_ID, type CameraMode, type ChatLine, type PanelTab, type Store } from "../state/store";
+import { CHANNEL_FOUNDER, CHANNEL_GENERAL, FOUNDER_ID, type CameraMode, type ChatLine, type CompanyStatus, type PanelTab, type Store } from "../state/store";
 import { ROLE_COLOR } from "../world/character";
 
 export interface OverlayActions {
@@ -11,7 +11,57 @@ export interface OverlayActions {
   resolveApproval: (approvalId: string, status: "approved" | "rejected", comment: string | null) => void;
   sendFounderMessage: (companyId: string, text: string) => void;
   setAgentPersona: (agentId: string, name: string, style: string, job: string) => void;
+  pauseCompany: (companyId: string) => void;
+  resumeCompany: (companyId: string) => void;
+  panic: () => void;
 }
+
+type MenuId = "company" | "actions" | "view" | "help";
+
+const MENU_IDS: { id: MenuId; label: string }[] = [
+  { id: "company", label: "Company" },
+  { id: "actions", label: "Actions" },
+  { id: "view", label: "View" },
+  { id: "help", label: "Help" },
+];
+
+/** One row of a dropdown. `divider` and `heading` rows carry no action. */
+interface MenuItem {
+  label?: string;
+  divider?: boolean;
+  heading?: string;
+  onSelect?: () => void;
+  disabled?: boolean;
+  checked?: boolean;
+  /** Muted key hint on the right. */
+  hint?: string;
+  /** Leading company status dot. */
+  dot?: CompanyStatus;
+  /** Muted secondary text after the label. */
+  sub?: string;
+  /** Right-aligned markers (LIVE, needs you). */
+  right?: HTMLElement[];
+  danger?: boolean;
+  /** Visually armed (the panic "Are you sure?" step). */
+  armed?: boolean;
+  /** The menu stays open after selecting this item. */
+  keepOpen?: boolean;
+  title?: string;
+}
+
+const SHORTCUTS: { keys: string[]; what: string }[] = [
+  { keys: ["1"], what: "Valley camera" },
+  { keys: ["2"], what: "Office camera" },
+  { keys: ["3"], what: "Follow the selected agent" },
+  { keys: ["4"], what: "Meeting camera" },
+  { keys: ["5"], what: "Walk (first person)" },
+  { keys: ["Esc"], what: "Back to the office or valley; close menus and dialogs" },
+  { keys: ["W", "A", "S", "D"], what: "Walk in first person; mouse to look; click to capture the mouse" },
+  { keys: ["Drag"], what: "Orbit the camera" },
+  { keys: ["Wheel"], what: "Zoom" },
+  { keys: ["←", "→"], what: "Switch between open menus" },
+  { keys: ["↑", "↓", "Enter"], what: "Move through a menu and choose an item" },
+];
 
 const INBOX_LIMIT = 8;
 /** Consecutive messages by one author within this window share a header. */
@@ -46,6 +96,14 @@ const KANBAN: { status: TaskStatus; label: string }[] = [
   { status: "review", label: "Review" },
   { status: "done", label: "Done" },
 ];
+
+/** Everything visible about a menu row, so a dropdown is only rebuilt when a row changes. */
+function menuItemKey(i: MenuItem): string {
+  if (i.divider) return "-";
+  if (i.heading !== undefined) return `#${i.heading}`;
+  const right = (i.right ?? []).map((r) => r.textContent).join(",");
+  return [i.label, i.disabled ? 1 : 0, i.checked ? 1 : 0, i.hint, i.dot, i.sub, right, i.danger ? 1 : 0, i.armed ? 1 : 0, i.title].join("|");
+}
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: string): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -168,14 +226,20 @@ export function describeEvent(e: Event, store: Store): { text: string; tone: "no
 /** The 2D DOM overlay. Re-renders from the store on every change (rAF-throttled). */
 export class Overlay {
   private readonly root: HTMLElement;
-  private readonly tabs: HTMLElement;
-  private readonly tray: HTMLElement;
-  private readonly cams: HTMLElement;
-  private readonly speeds: HTMLElement;
+  private readonly menus: HTMLElement;
+  private readonly menuEls = new Map<MenuId, { wrap: HTMLElement; button: HTMLButtonElement; label: HTMLElement; count: HTMLElement; dropdown: HTMLElement }>();
+  private openMenuId: MenuId | null = null;
+  /** Content signature of each open dropdown, to skip needless rebuilds. */
+  private readonly menuKeys = new Map<MenuId, string>();
+  private panicArmed = false;
+  private readonly bell: HTMLButtonElement;
+  private readonly bellCount: HTMLElement;
   private readonly conn: HTMLElement;
   private readonly panel: HTMLElement;
+  private readonly feed: HTMLElement;
   private readonly feedList: HTMLElement;
-  private readonly foundButton: HTMLButtonElement;
+  private readonly infoBackdrop: HTMLElement;
+  private readonly infoBody: HTMLElement;
   private readonly modalBackdrop: HTMLElement;
   private readonly modalError: HTMLElement;
   private readonly modalForm: HTMLFormElement;
@@ -209,51 +273,77 @@ export class Overlay {
     this.root = root;
     const top = el("div", "topbar");
     top.append(el("div", "brand", "TokenValley"));
-    this.tabs = el("div", "tabs");
-    top.append(this.tabs);
-    this.foundButton = el("button", "", "+ Found company");
-    this.foundButton.title = "Found a new company";
-    this.foundButton.addEventListener("click", () => this.openFoundModal());
-    top.append(this.foundButton);
+    this.menus = el("div", "menus");
+    this.menus.setAttribute("role", "menubar");
+    for (const m of MENU_IDS) {
+      const wrap = el("div", "menu");
+      wrap.dataset.menu = m.id;
+      const button = el("button", "menu-btn");
+      button.type = "button";
+      button.setAttribute("aria-haspopup", "true");
+      button.setAttribute("aria-expanded", "false");
+      button.setAttribute("aria-label", `${m.label} menu`);
+      const label = el("span", "label", m.label);
+      const count = el("span", "count");
+      const caret = el("span", "caret", "▾");
+      button.append(label, count, caret);
+      button.addEventListener("click", () => (this.openMenuId === m.id ? this.closeMenus() : this.openMenu(m.id)));
+      button.addEventListener("mouseenter", () => {
+        if (this.openMenuId !== null && this.openMenuId !== m.id) this.openMenu(m.id);
+      });
+      const dropdown = el("div", "dropdown");
+      dropdown.setAttribute("role", "menu");
+      wrap.append(button, dropdown);
+      this.menus.append(wrap);
+      this.menuEls.set(m.id, { wrap, button, label, count, dropdown });
+    }
+    this.menus.addEventListener("keydown", (e) => this.onMenuKey(e));
+    top.append(this.menus);
     top.append(el("div", "spacer"));
-    this.tray = el("div", "tray");
-    top.append(this.tray);
-    const controls = el("div", "controls");
-    this.cams = el("div", "group cams");
-    for (const c of CAMERA_MODES) {
-      const b = el("button", "", `${c.key} ${c.label}`);
-      b.dataset.mode = c.mode;
-      b.title = `Camera: ${c.label} (key ${c.key})`;
-      b.addEventListener("click", () => actions.setCamera(c.mode));
-      this.cams.append(b);
-    }
-    controls.append(this.cams);
-    this.speeds = el("div", "group speeds");
-    for (const s of SPEEDS) {
-      const b = el("button", "", `${s}x`);
-      b.dataset.speed = String(s);
-      b.title = "Animation speed";
-      b.addEventListener("click", () => actions.setSpeed(s));
-      this.speeds.append(b);
-    }
-    controls.append(this.speeds);
-    top.append(controls);
+    this.bell = el("button", "bell");
+    this.bell.type = "button";
+    this.bell.title = "Something needs the founder";
+    this.bell.setAttribute("aria-label", "Pending requests");
+    this.bell.innerHTML =
+      '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M8 1.5a1 1 0 0 1 1 1v.4a4.5 4.5 0 0 1 3.5 4.4V10l1.3 1.6a.6.6 0 0 1-.5 1H2.7a.6.6 0 0 1-.5-1L3.5 10V7.3A4.5 4.5 0 0 1 7 2.9v-.4a1 1 0 0 1 1-1Zm-1.8 12h3.6a1.8 1.8 0 0 1-3.6 0Z"/></svg>';
+    this.bellCount = el("span", "count");
+    this.bell.append(this.bellCount);
+    this.bell.addEventListener("click", () => this.openMenu("actions", true));
+    top.append(this.bell);
     this.conn = el("div", "conn disconnected", "disconnected");
     top.append(this.conn);
     root.append(top);
 
+    document.addEventListener("pointerdown", (e) => {
+      if (this.openMenuId === null) return;
+      if (!(e.target instanceof Node) || !this.menus.contains(e.target)) this.closeMenus();
+    });
+
     this.panel = el("div", "panel");
     root.append(this.panel);
 
-    const feed = el("div", "feed");
-    feed.append(el("div", "title", "Activity"));
+    this.feed = el("div", "feed");
+    this.feed.append(el("div", "title", "Activity"));
     this.feedList = el("div", "list");
-    feed.append(this.feedList);
-    root.append(feed);
+    this.feed.append(this.feedList);
+    root.append(this.feed);
 
-    const hint = el("div", "hint");
-    hint.innerHTML = "<kbd>1</kbd> valley <kbd>2</kbd> office <kbd>3</kbd> follow <kbd>4</kbd> meeting <kbd>Esc</kbd> back · drag to orbit, wheel to zoom";
-    root.append(hint);
+    // Info modal (keyboard shortcuts, about).
+    this.infoBackdrop = el("div", "modal-backdrop");
+    const imodal = el("div", "modal info");
+    this.infoBody = el("div");
+    imodal.append(this.infoBody);
+    const iactions = el("div", "actions");
+    const iclose = el("button", "primary", "Close");
+    iclose.type = "button";
+    iclose.addEventListener("click", () => this.closeInfo());
+    iactions.append(iclose);
+    imodal.append(iactions);
+    this.infoBackdrop.append(imodal);
+    this.infoBackdrop.addEventListener("click", (e) => {
+      if (e.target === this.infoBackdrop) this.closeInfo();
+    });
+    root.append(this.infoBackdrop);
 
     // First-person HUD.
     root.append(el("div", "crosshair"));
@@ -355,6 +445,385 @@ export class Overlay {
 
     store.onChange(() => this.schedule());
     this.render();
+  }
+
+  // ---- menu bar ------------------------------------------------------------------
+
+  isMenuOpen(): boolean {
+    return this.openMenuId !== null;
+  }
+
+  /** Opens one menu (closing any other). With `focusFirst`, keyboard focus lands on its first item. */
+  openMenu(id: MenuId, focusFirst = false): void {
+    if (this.openMenuId !== id) this.panicArmed = false;
+    this.openMenuId = id;
+    this.renderMenus();
+    const m = this.menuEls.get(id);
+    if (!m) return;
+    if (focusFirst) this.focusMenuItem(id, 0);
+    else m.button.focus();
+  }
+
+  /** Closes the open menu; with `refocus`, keyboard focus returns to its button. */
+  closeMenus(refocus = false): void {
+    const prev = this.openMenuId;
+    this.openMenuId = null;
+    this.panicArmed = false;
+    this.renderMenus();
+    if (refocus && prev) this.menuEls.get(prev)?.button.focus();
+  }
+
+  private menuItemsOf(id: MenuId): HTMLButtonElement[] {
+    const m = this.menuEls.get(id);
+    return m ? [...m.dropdown.querySelectorAll<HTMLButtonElement>("button.mi:not(:disabled)")] : [];
+  }
+
+  /** Focuses the enabled item at `index` (negative counts from the end, wrapping). */
+  private focusMenuItem(id: MenuId, index: number): void {
+    const items = this.menuItemsOf(id);
+    if (items.length === 0) return;
+    const i = ((index % items.length) + items.length) % items.length;
+    items[i]?.focus();
+  }
+
+  private onMenuKey(e: KeyboardEvent): void {
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    const wrap = target.closest<HTMLElement>(".menu");
+    const id = wrap?.dataset.menu as MenuId | undefined;
+    if (!id) return;
+    const order = MENU_IDS.map((m) => m.id);
+    const sibling = (delta: number) => order[(order.indexOf(id) + delta + order.length) % order.length] ?? id;
+    const onButton = target.classList.contains("menu-btn");
+    switch (e.key) {
+      case "Escape":
+        if (this.openMenuId === null) return;
+        e.preventDefault();
+        e.stopPropagation(); // the window handler would otherwise also move the camera
+        this.closeMenus(true);
+        return;
+      case "ArrowLeft":
+      case "ArrowRight": {
+        e.preventDefault();
+        const next = sibling(e.key === "ArrowRight" ? 1 : -1);
+        if (this.openMenuId !== null) this.openMenu(next, !onButton);
+        else this.menuEls.get(next)?.button.focus();
+        return;
+      }
+      case "ArrowDown":
+      case "ArrowUp": {
+        e.preventDefault();
+        if (this.openMenuId !== id) {
+          this.openMenu(id, true);
+          return;
+        }
+        const items = this.menuItemsOf(id);
+        const cur = items.indexOf(target as HTMLButtonElement);
+        const delta = e.key === "ArrowDown" ? 1 : -1;
+        this.focusMenuItem(id, cur === -1 ? (delta === 1 ? 0 : -1) : cur + delta);
+        return;
+      }
+      case "Home":
+      case "End":
+        if (this.openMenuId !== id) return;
+        e.preventDefault();
+        this.focusMenuItem(id, e.key === "Home" ? 0 : -1);
+        return;
+      case "Enter":
+      case " ":
+        e.preventDefault();
+        if (onButton) {
+          if (this.openMenuId === id) this.closeMenus(true);
+          else this.openMenu(id, true);
+        } else target.click();
+        return;
+      case "Tab":
+        if (this.openMenuId !== null) this.closeMenus();
+        return;
+    }
+  }
+
+  private buildMenuItem(item: MenuItem): HTMLElement {
+    if (item.divider) return el("div", "mdiv");
+    if (item.heading !== undefined) return el("div", "mhead", item.heading);
+    const b = el("button", `mi${item.danger ? " danger" : ""}${item.armed ? " armed" : ""}`);
+    b.type = "button";
+    b.setAttribute("role", "menuitem");
+    b.disabled = item.disabled === true || !item.onSelect;
+    if (item.title) b.title = item.title;
+    const lead = item.dot ? el("span", `dot ${item.dot}`) : el("span", "check", item.checked ? "✓" : "");
+    if (item.checked) b.setAttribute("aria-checked", "true");
+    b.append(lead);
+    const text = el("span", "mi-text");
+    text.append(el("span", "mi-label", item.label ?? ""));
+    if (item.sub) text.append(el("span", "mi-sub", item.sub));
+    b.append(text);
+    const right = el("span", "mi-right");
+    for (const r of item.right ?? []) right.append(r);
+    if (item.hint) right.append(el("kbd", "", item.hint));
+    b.append(right);
+    b.addEventListener("click", () => {
+      if (b.disabled || !item.onSelect) return;
+      item.onSelect();
+      if (!item.keepOpen) this.closeMenus();
+    });
+    return b;
+  }
+
+  private companyMenu(): MenuItem[] {
+    const store = this.store;
+    const items: MenuItem[] = [];
+    const list = store.companyList();
+    if (list.length === 0) items.push({ label: "No companies yet", disabled: true });
+    for (const c of list) {
+      const status = store.statusOf(c.id);
+      const right: HTMLElement[] = [];
+      if (c.live) right.push(el("span", "badge live", "LIVE"));
+      if (status === "waiting_on_founder") right.push(el("span", "needs", "needs you"));
+      items.push({
+        label: c.name,
+        sub: c.phase.replace(/_/g, " "),
+        dot: status,
+        right,
+        checked: c.id === store.focusedCompanyId,
+        title: `${c.name}: ${status.replace(/_/g, " ")}`,
+        onSelect: () => this.actions.focusCompany(c.id),
+      });
+    }
+    items.push({ divider: true });
+    items.push({
+      label: "Found company…",
+      disabled: store.demo,
+      title: store.demo ? "Not available in demo mode" : "Found a new company",
+      onSelect: () => this.openFoundModal(),
+    });
+    return items;
+  }
+
+  private actionsMenu(): MenuItem[] {
+    const store = this.store;
+    const c = store.focusedCompany();
+    const pending = c ? store.pendingApprovalFor(c.id) : null;
+    const paused = c?.phase === "paused";
+    const items: MenuItem[] = [
+      {
+        label: "Approve / reject pending request…",
+        disabled: !pending,
+        title: pending ? pending.summary : "Nothing is waiting on you in this company",
+        onSelect: () => {
+          if (pending) this.openApproval(pending.id);
+        },
+      },
+      {
+        label: "Message the CEO",
+        disabled: !c,
+        onSelect: () => {
+          if (c) this.messageCeo(c.id);
+        },
+      },
+      {
+        label: paused ? "Resume company" : "Pause company",
+        disabled: !c,
+        onSelect: () => {
+          if (!c) return;
+          if (paused) this.actions.resumeCompany(c.id);
+          else this.actions.pauseCompany(c.id);
+        },
+      },
+      { divider: true },
+      {
+        label: this.panicArmed ? "Are you sure? Click again to confirm" : "Panic: stop all spending",
+        danger: true,
+        armed: this.panicArmed,
+        keepOpen: !this.panicArmed,
+        onSelect: () => {
+          if (this.panicArmed) {
+            this.panicArmed = false;
+            this.actions.panic();
+          } else {
+            this.panicArmed = true;
+            this.renderMenus();
+            this.menuItemsOf("actions").find((b) => b.classList.contains("armed"))?.focus();
+          }
+        },
+      },
+    ];
+    return items;
+  }
+
+  private viewMenu(): MenuItem[] {
+    const store = this.store;
+    const items: MenuItem[] = [{ heading: "Camera" }];
+    for (const cam of CAMERA_MODES) {
+      items.push({ label: cam.label, checked: store.cameraMode === cam.mode, hint: cam.key, onSelect: () => this.actions.setCamera(cam.mode) });
+    }
+    items.push({ divider: true }, { heading: "Speed" });
+    for (const s of SPEEDS) items.push({ label: `${s}x`, checked: store.speed === s, onSelect: () => this.actions.setSpeed(s) });
+    items.push({ divider: true }, { heading: "Panel" });
+    for (const t of PANEL_TABS) {
+      items.push({ label: t.tab === "company" ? "Company panel" : t.label, checked: store.panelTab === t.tab, onSelect: () => this.setPanelTab(t.tab) });
+    }
+    items.push({
+      label: "Activity feed",
+      checked: store.feedVisible,
+      onSelect: () => {
+        store.feedVisible = !store.feedVisible;
+        store.notify();
+      },
+    });
+    return items;
+  }
+
+  private helpMenu(): MenuItem[] {
+    return [
+      { label: "Keyboard shortcuts", onSelect: () => this.openShortcuts() },
+      {
+        label: "Open demo mode",
+        disabled: this.store.demo,
+        title: this.store.demo ? "You are in demo mode" : "Reload the client with ?demo=1 (no server needed)",
+        onSelect: () => {
+          window.location.search = "?demo=1";
+        },
+      },
+      { divider: true },
+      { label: "About TokenValley", onSelect: () => this.openAbout() },
+    ];
+  }
+
+  private menuItems(id: MenuId): MenuItem[] {
+    switch (id) {
+      case "company":
+        return this.companyMenu();
+      case "actions":
+        return this.actionsMenu();
+      case "view":
+        return this.viewMenu();
+      case "help":
+        return this.helpMenu();
+    }
+  }
+
+  /** Rebuilds every dropdown from the store and syncs open/closed state. Keeps keyboard focus on the same item. */
+  private renderMenus(): void {
+    const store = this.store;
+    const c = store.focusedCompany();
+    const pendingTotal = store.pendingApprovalCount();
+    for (const { id } of MENU_IDS) {
+      const m = this.menuEls.get(id);
+      if (!m) continue;
+      const open = this.openMenuId === id;
+      m.wrap.classList.toggle("open", open);
+      m.button.setAttribute("aria-expanded", open ? "true" : "false");
+      if (!open) {
+        m.dropdown.replaceChildren();
+        this.menuKeys.delete(id);
+      } else {
+        // Only rebuild the nodes when the content changed, so hover and clicks
+        // in progress are not disturbed by unrelated store updates.
+        const items = this.menuItems(id);
+        const key = items.map(menuItemKey).join("\n");
+        if (key !== this.menuKeys.get(id)) {
+          const prevIndex = this.menuItemsOf(id).indexOf(document.activeElement as HTMLButtonElement);
+          m.dropdown.replaceChildren(...items.map((item) => this.buildMenuItem(item)));
+          this.menuKeys.set(id, key);
+          if (prevIndex >= 0) this.menuItemsOf(id)[prevIndex]?.focus();
+        }
+      }
+      if (id === "company") {
+        m.label.replaceChildren();
+        if (c) {
+          m.label.append(el("span", `dot ${store.statusOf(c.id)}`), el("span", "name", c.name));
+          m.button.title = `${c.name}: ${store.statusOf(c.id).replace(/_/g, " ")}`;
+        } else {
+          m.label.append(el("span", "name muted", "No company"));
+          m.button.title = "No company focused";
+        }
+      }
+      if (id === "actions") {
+        m.count.textContent = pendingTotal > 0 ? String(pendingTotal) : "";
+        m.count.classList.toggle("show", pendingTotal > 0);
+      }
+    }
+    this.bell.classList.toggle("show", pendingTotal > 0);
+    this.bellCount.textContent = String(pendingTotal);
+    this.bell.title = pendingTotal === 1 ? "1 request needs you" : `${pendingTotal} requests need you`;
+  }
+
+  /** Switches the panel to the Founder chat thread and focuses the compose box. */
+  private messageCeo(companyId: string): void {
+    this.store.panelTab = "chat";
+    this.store.chatChannel.set(companyId, CHANNEL_FOUNDER);
+    this.chatAtBottom = true;
+    this.store.notify();
+    this.render();
+    this.panel.querySelector<HTMLInputElement>(".compose input")?.focus();
+  }
+
+  // ---- info modal (shortcuts, about) --------------------------------------------
+
+  isInfoOpen(): boolean {
+    return this.infoBackdrop.classList.contains("open");
+  }
+
+  closeInfo(): void {
+    this.infoBackdrop.classList.remove("open");
+  }
+
+  private openShortcuts(): void {
+    this.infoBody.replaceChildren(el("h2", "", "Keyboard shortcuts"));
+    const table = el("div", "shortcuts");
+    for (const s of SHORTCUTS) {
+      const keys = el("span", "keys");
+      for (const k of s.keys) keys.append(el("kbd", "", k));
+      table.append(keys, el("span", "what", s.what));
+    }
+    this.infoBody.append(table);
+    this.infoBackdrop.classList.add("open");
+    this.infoBackdrop.querySelector<HTMLButtonElement>("button")?.focus();
+  }
+
+  private openAbout(): void {
+    this.infoBody.replaceChildren(el("h2", "", "About TokenValley"));
+    this.infoBody.append(
+      el(
+        "p",
+        "about",
+        "TokenValley is a low-poly valley of AI companies. Each building is a company staffed by Claude Code agents that build a project in a folder on your machine, while a cartoon office shows them walking between desks, calling meetings, and arguing in speech bubbles. You are the founder: you found companies, hand each one a brief, watch, and approve or reject at gates. It runs on your own Claude Code subscription; the client only renders what the server's events say.",
+      ),
+    );
+    const repo = el("p", "about muted");
+    repo.append("Source: ", el("code", "", "github.com/Surya5599/TokenValley"), " (this client lives in ", el("code", "", "apps/client"), ")");
+    this.infoBody.append(repo);
+    this.infoBackdrop.classList.add("open");
+    this.infoBackdrop.querySelector<HTMLButtonElement>("button")?.focus();
+  }
+
+  /**
+   * Handles the Escape key for everything the overlay owns, topmost first.
+   * Returns true when something was closed (so the caller leaves the camera alone).
+   */
+  handleEscape(): boolean {
+    if (this.openMenuId !== null) {
+      this.closeMenus(true);
+      return true;
+    }
+    if (this.isInfoOpen()) {
+      this.closeInfo();
+      return true;
+    }
+    if (this.isModalOpen()) {
+      this.closeFoundModal();
+      return true;
+    }
+    if (this.isPersonaOpen()) {
+      this.closePersona();
+      return true;
+    }
+    if (this.isApprovalOpen()) {
+      this.closeApproval();
+      return true;
+    }
+    return false;
   }
 
   // ---- persona modal ------------------------------------------------------------
@@ -598,29 +1067,8 @@ export class Overlay {
 
   private renderTop(): void {
     const store = this.store;
-    this.tabs.replaceChildren();
-    for (const c of store.companyList()) {
-      const b = el("button", `tab${c.id === store.focusedCompanyId ? " active" : ""}`);
-      b.append(el("span", `dot ${store.statusOf(c.id)}`), el("span", "", c.name));
-      b.title = `${c.name}: ${store.statusOf(c.id).replace(/_/g, " ")}`;
-      b.addEventListener("click", () => this.actions.focusCompany(c.id));
-      this.tabs.append(b);
-    }
-    this.tray.replaceChildren();
-    for (const c of store.companyList()) {
-      if (store.statusOf(c.id) !== "waiting_on_founder") continue;
-      const pending = store.pendingApprovalFor(c.id);
-      const pill = el("button", "pill pulse", `${c.name} needs you`);
-      pill.addEventListener("click", () => {
-        this.actions.focusCompany(c.id);
-        if (pending) this.openApproval(pending.id);
-      });
-      this.tray.append(pill);
-    }
-    this.foundButton.disabled = store.demo;
-    this.foundButton.title = store.demo ? "Not available in demo mode" : "Found a new company";
-    for (const b of this.cams.querySelectorAll<HTMLButtonElement>("button")) b.classList.toggle("active", b.dataset.mode === store.cameraMode);
-    for (const b of this.speeds.querySelectorAll<HTMLButtonElement>("button")) b.classList.toggle("active", Number(b.dataset.speed) === store.speed);
+    this.renderMenus();
+    this.feed.style.display = store.feedVisible ? "" : "none";
     if (store.demo) {
       this.conn.className = "conn demo";
       this.conn.textContent = "demo";

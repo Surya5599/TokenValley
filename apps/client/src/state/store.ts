@@ -95,6 +95,8 @@ export class Store {
   focusedCompanyId: string | null = null;
   selectedAgentId: string | null = null;
   panelTab: PanelTab = "company";
+  /** Whether the bottom-left activity feed is shown (View menu toggle). */
+  feedVisible = true;
   cameraMode: CameraMode = "valley";
   speed = 1;
   connection: ConnStatus = "disconnected";
@@ -132,6 +134,13 @@ export class Store {
   pendingApprovalFor(companyId: string): Approval | null {
     for (const a of this.approvals.values()) if (a.companyId === companyId && a.status === "pending") return a;
     return null;
+  }
+
+  /** Number of pending approvals across every company. */
+  pendingApprovalCount(): number {
+    let n = 0;
+    for (const a of this.approvals.values()) if (a.status === "pending") n++;
+    return n;
   }
 
   founderThreadOf(companyId: string): FounderMessage[] {
