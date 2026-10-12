@@ -31,9 +31,13 @@ const NAMES = ["Dana", "Priya", "Milo", "Quinn", "Sasha", "Theo", "Ira", "Noor",
 function prepareWorkspaceBranch(workspacePath: string, slug: string): void {
   const git = (...args: string[]) => execFileSync("git", args, { cwd: workspacePath, stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
   try {
+    // Only treat the folder as a repo if it is the repo root. A workspace that
+    // merely sits inside some other repository (for example this one) gets its
+    // own nested repo, so the company can never switch the parent's branch.
     let isRepo = false;
     try {
-      isRepo = git("rev-parse", "--is-inside-work-tree") === "true";
+      const top = git("rev-parse", "--show-toplevel").replace(/\\/g, "/").toLowerCase();
+      isRepo = top === workspacePath.replace(/\\/g, "/").toLowerCase();
     } catch {
       isRepo = false;
     }
