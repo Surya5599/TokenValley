@@ -26,6 +26,10 @@ export class CompanyRegistry {
     return join(this.dataDir, `company-${slug}.json`);
   }
 
+  fileFor(slug: string): string {
+    return this.file(slug);
+  }
+
   list(): CompanyRecord[] {
     const out: CompanyRecord[] = [];
     const idx = join(this.dataDir, "companies.json");

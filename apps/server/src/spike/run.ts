@@ -12,7 +12,7 @@ import { ClaudeRunner } from "../agent/claude-runner.js";
  *               -> observe a real tool call and real usage numbers
  *
  * Run with: pnpm spike
- * This uses your subscription. It is capped at 3 turns on haiku.
+ * This uses your subscription. It is capped at 6 turns on haiku.
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -41,7 +41,7 @@ runner.on("line", (l) => {
 const started = Date.now();
 const result = await runner.run({
   model: process.env.TOKENVALLEY_SPIKE_MODEL ?? "haiku",
-  maxTurns: 3,
+  maxTurns: 6,
   cwd: repoRoot,
   tempDir: dataDir,
   allowedTools: ["mcp__tokenvalley__send_message", "mcp__tokenvalley__create_task"],

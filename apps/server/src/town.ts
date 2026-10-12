@@ -16,7 +16,18 @@ export class Town {
   readonly tasks = new Map<string, Task>();
   readonly events: Event[] = [];
   focusedCompanyId: string | null = null;
-  poolSize = 3;
+  poolSize = Number(process.env.TOKENVALLEY_POOL ?? 2);
+  private liveSlots = 0;
+
+  liveSlotsFree(): number {
+    return Math.max(0, this.poolSize - this.liveSlots);
+  }
+  reserveSlot(): void {
+    this.liveSlots += 1;
+  }
+  releaseSlot(): void {
+    this.liveSlots = Math.max(0, this.liveSlots - 1);
+  }
 
   private listeners = new Set<(msg: ServerMessage) => void>();
   private seq = 0;

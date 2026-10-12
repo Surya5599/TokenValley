@@ -4,6 +4,12 @@ dist/
 *.tsbuildinfo
 .vite/
 
+# your companies stay private; the README and example are shared
+companies/*
+!companies/README.md
+!companies/_example/
+companies/_example/status.md
+
 # runtime state: never commit project workspaces, databases, or logs
 workspaces/*
 !workspaces/.gitkeep

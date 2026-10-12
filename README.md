@@ -17,9 +17,9 @@ Early. See [docs/PLAN.md](docs/PLAN.md) for the full plan and phase gates.
 | Phase | State |
 | --- | --- |
 | 0 Spike: headless `claude` + orchestrator tool server | Done |
-| 1 Valley: 3D office, characters, pathfinding, fake events | In progress |
-| 2 First real agents (CEO, PM) | Not started |
-| 3 Full cast, hires, workspace on a branch | Not started |
+| 1 Valley: 3D office, characters, pathfinding, fake events | Done |
+| 2 Real agents: file-based founding, CEO kickoff, turn scheduler | Done |
+| 3 Full cast, hires, workspace on a branch | In progress |
 | 4 Founder controls, gates, budgets | Not started |
 | 5 Polish, replay, reports | Not started |
 
@@ -36,12 +36,40 @@ pnpm install
 pnpm dev
 ```
 
-Open http://localhost:5173. The server runs at ws://localhost:8787 with a fake
-event generator until Phase 2 lands. Add `?demo=1` to the client URL to run it
-without a server.
+Open http://localhost:5173. Three fake companies run on templates so you can
+see the office move without spending anything. Set `TOKENVALLEY_MODE=live`
+to hide them.
 
-To prove the agent runtime chain on your machine (uses your subscription,
-capped at 3 turns on haiku):
+## Found a company
+
+Create a folder under `companies/` with a `company.md` in it:
+
+```md
+---
+name: Pied Prompter
+tagline: Middle-out for your to-do list.
+workspace: ../../workspaces/pied-prompter
+roster: startup
+budget_turns: 60
+models:
+  engineer: sonnet
+  ceo: haiku
+---
+
+Build a to-do list web app. Plain HTML, CSS and JavaScript in one file.
+```
+
+That is the whole setup. The server notices the file, the CEO reads the
+brief, messages you, creates goals, and the team starts talking and working.
+A `status.md` appears next to the file so you can follow along without the
+UI. See `companies/README.md` for every option and `companies/_example/` for
+a complete file.
+
+Each agent is one headless `claude` process per turn, so a company costs only
+what its agents actually do. Idle agents cost nothing. A small pool (default
+2) limits how many agents run at once across the whole valley.
+
+To prove the agent runtime chain on your machine (capped at 6 turns on haiku):
 
 ```bash
 pnpm spike

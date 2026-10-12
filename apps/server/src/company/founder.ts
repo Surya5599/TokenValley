@@ -31,15 +31,16 @@ export function slugify(name: string): string {
  * roster template, applies model overrides, emits the founding events, and
  * persists the record. Returns the record so the caller can start the CEO.
  */
-export function foundCompany(town: Town, registry: CompanyRegistry, input: FoundCompanyInput): CompanyRecord {
+export function foundCompany(town: Town, registry: CompanyRegistry, input: FoundCompanyInput, slugHint?: string): CompanyRecord {
   const workspacePath = resolve(input.workspacePath);
   if (!existsSync(workspacePath) || !statSync(workspacePath).isDirectory()) {
     throw new Error(`Workspace folder does not exist: ${input.workspacePath}`);
   }
   const roster = loadRoster(input.rosterTemplate);
-  let slug = slugify(input.name);
+  const base = slugHint ? slugify(slugHint) : slugify(input.name);
+  let slug = base;
   const taken = new Set([...town.companies.values()].map((c) => c.slug));
-  for (let n = 2; taken.has(slug); n++) slug = `${slugify(input.name)}-${n}`;
+  for (let n = 2; taken.has(slug); n++) slug = `${base}-${n}`;
 
   const id = town.nextId("co");
   const plot = town.companies.size;

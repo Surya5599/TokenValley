@@ -187,6 +187,7 @@ export async function runAgentTurn(opts: TurnOptions): Promise<void> {
   const dataDir = join(REPO_ROOT, "data");
 
   town.emit({ ...ev(town, cid), type: "agent_status", agentId: agent.id, status: "working", line: "thinking" });
+  registry.save(record); // so read_board sees the latest board
   runner.on("tool_use", (t) => translate(opts, t.name, t.input));
   runner.on("stderr", (s) => process.stderr.write(`[${company.slug}/${agent.role}] ${s}`));
 
@@ -204,7 +205,12 @@ export async function runAgentTurn(opts: TurnOptions): Promise<void> {
       tokenvalley: {
         command: NPX,
         args: ["tsx", MCP_ENTRY],
-        env: { TOKENVALLEY_COMPANY: company.slug, TOKENVALLEY_AGENT: agent.role, TOKENVALLEY_TOOL_LOG: join(dataDir, `tools-${company.slug}.jsonl`) },
+        env: {
+          TOKENVALLEY_COMPANY: company.slug,
+          TOKENVALLEY_AGENT: agent.role,
+          TOKENVALLEY_TOOL_LOG: join(dataDir, `tools-${company.slug}.jsonl`),
+          TOKENVALLEY_BOARD_FILE: registry.fileFor(company.slug),
+        },
       },
     },
   });

@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { appendFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync } from "node:fs";
 
 /**
  * The orchestrator tool server. Each agent process gets its own instance over
@@ -18,6 +18,7 @@ import { appendFileSync } from "node:fs";
 const COMPANY = process.env.TOKENVALLEY_COMPANY ?? "unknown-company";
 const AGENT = process.env.TOKENVALLEY_AGENT ?? "unknown-agent";
 const LOG = process.env.TOKENVALLEY_TOOL_LOG;
+const BOARD_FILE = process.env.TOKENVALLEY_BOARD_FILE;
 
 function record(tool: string, input: unknown): void {
   if (!LOG) return;
@@ -109,7 +110,15 @@ server.tool(
   {},
   async () => {
     record("read_board", {});
-    return ok("Board is empty (Phase 0 stub).");
+    if (!BOARD_FILE || !existsSync(BOARD_FILE)) return ok("Board is empty.");
+    try {
+      const rec = JSON.parse(readFileSync(BOARD_FILE, "utf8")) as { tasks?: { id: string; title: string; status: string; ownerRole: string | null }[]; agents?: { role: string; name: string; status: string; kind: string }[] };
+      const tasks = (rec.tasks ?? []).map((t) => `- ${t.id} [${t.status}] ${t.title} (owner: ${t.ownerRole ?? "none"})`);
+      const people = (rec.agents ?? []).filter((a) => a.kind !== "npc" && a.status !== "retired").map((a) => `- ${a.role}: ${a.name} (${a.status})`);
+      return ok(["## Tasks", ...(tasks.length ? tasks : ["- (none)"]), "", "## People", ...people].join("\n"));
+    } catch {
+      return ok("Board could not be read.");
+    }
   },
 );
 
