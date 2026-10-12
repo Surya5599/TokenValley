@@ -1,0 +1,25 @@
+{
+  "name": "enterprise",
+  "description": "The full thirteen-role circus. Expensive. Funny.",
+  "core": [
+    "ceo",
+    "pm",
+    "engineer",
+    "backend",
+    "frontend",
+    "qa",
+    "designer",
+    "marketing",
+    "legal",
+    "hr",
+    "it",
+    "intern"
+  ],
+  "npcs": [
+    "cfo",
+    "receptionist"
+  ],
+  "hireable": [],
+  "modelOverrides": {},
+  "maxLiveAgents": 3
+}

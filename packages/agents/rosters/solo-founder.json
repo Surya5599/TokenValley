@@ -1,0 +1,20 @@
+{
+  "name": "solo-founder",
+  "description": "Cheapest possible company for experiments: CEO doubles as PM, one engineer.",
+  "core": [
+    "ceo",
+    "engineer"
+  ],
+  "npcs": [
+    "cfo"
+  ],
+  "hireable": [
+    "qa",
+    "intern"
+  ],
+  "modelOverrides": {
+    "ceo": "haiku",
+    "engineer": "sonnet"
+  },
+  "maxLiveAgents": 1
+}

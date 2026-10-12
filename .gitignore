@@ -1,0 +1,29 @@
+# dependencies / build
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+
+# runtime state: never commit project workspaces, databases, or logs
+workspaces/*
+!workspaces/.gitkeep
+data/*
+!data/.gitkeep
+*.sqlite
+*.sqlite-journal
+*.db
+logs/
+
+# local config and secrets
+.env
+.env.*
+!.env.example
+tokenvalley.local.json
+.claude/settings.local.json
+.mcp.local.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

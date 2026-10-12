@@ -1,0 +1,26 @@
+{
+  "name": "startup",
+  "description": "Default small company: five core roles, two NPCs, hires on demand.",
+  "core": [
+    "ceo",
+    "pm",
+    "engineer",
+    "qa",
+    "designer"
+  ],
+  "npcs": [
+    "cfo",
+    "receptionist"
+  ],
+  "hireable": [
+    "backend",
+    "frontend",
+    "marketing",
+    "legal",
+    "hr",
+    "it",
+    "intern"
+  ],
+  "modelOverrides": {},
+  "maxLiveAgents": 2
+}
