@@ -1,4 +1,5 @@
 import { existsSync, statSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
 import {
   DEFAULT_MODEL,
@@ -22,6 +23,41 @@ const PALETTES: Company["palette"][] = [
 
 const NAMES = ["Dana", "Priya", "Milo", "Quinn", "Sasha", "Theo", "Ira", "Noor", "Felix", "Wren"];
 
+/**
+ * Puts the workspace on its own git branch so the company can never damage
+ * the founder's real branch. A folder that is not a repo gets one. Failures
+ * are logged, never fatal: git is a safety net, not a requirement.
+ */
+function prepareWorkspaceBranch(workspacePath: string, slug: string): void {
+  const git = (...args: string[]) => execFileSync("git", args, { cwd: workspacePath, stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+  try {
+    let isRepo = false;
+    try {
+      isRepo = git("rev-parse", "--is-inside-work-tree") === "true";
+    } catch {
+      isRepo = false;
+    }
+    if (!isRepo) {
+      git("init", "-q");
+      git("add", "-A");
+      try {
+        git("-c", "user.name=TokenValley", "-c", "user.email=tokenvalley@localhost", "commit", "-q", "-m", "Initial state before TokenValley", "--allow-empty");
+      } catch { /* nothing to commit */ }
+    }
+    const branch = `tokenvalley/${slug}`;
+    const current = git("rev-parse", "--abbrev-ref", "HEAD");
+    if (current !== branch) {
+      try {
+        git("checkout", "-q", "-b", branch);
+      } catch {
+        git("checkout", "-q", branch);
+      }
+    }
+  } catch (err) {
+    console.warn(`[tokenvalley] could not prepare a git branch in ${workspacePath}:`, err instanceof Error ? err.message : err);
+  }
+}
+
 export function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "company";
 }
@@ -41,6 +77,8 @@ export function foundCompany(town: Town, registry: CompanyRegistry, input: Found
   let slug = base;
   const taken = new Set([...town.companies.values()].map((c) => c.slug));
   for (let n = 2; taken.has(slug); n++) slug = `${base}-${n}`;
+
+  prepareWorkspaceBranch(workspacePath, slug);
 
   const id = town.nextId("co");
   const plot = town.companies.size;

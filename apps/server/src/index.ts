@@ -156,7 +156,25 @@ wss.on("connection", (ws: WebSocket) => {
         pendingApprovals.delete(msg.approvalId);
         const resolved: Approval = { ...approval, status: msg.status, founderComment: msg.comment };
         town.emit({ ...ev(approval.companyId), type: "approval_resolved", approval: resolved });
-        town.emit({ ...ev(approval.companyId), type: "company_phase", phase: "building" });
+        const shipped = resolved.kind === "ship" && resolved.status === "approved";
+        town.emit({ ...ev(approval.companyId), type: "company_phase", phase: shipped ? "shipped" : "building" });
+        if (shipped) {
+          const rec = records.get(approval.companyId);
+          if (rec) registry.save(rec);
+        }
+        break;
+      }
+      case "founder_message": {
+        const rec = records.get(msg.companyId);
+        if (!rec) break;
+        const ceo = rec.agents.find((a) => a.role === "ceo");
+        if (!ceo) break;
+        town.emit({
+          ...ev(rec.company.id), type: "send_message", agentId: "founder", toAgentId: ceo.id,
+          message: { id: town.nextId("msg"), companyId: rec.company.id, from: "founder", to: ceo.id, text: msg.text, taskId: null, timestamp: Date.now() },
+        });
+        scheduler.founderMessage(rec, msg.text);
+        if (rec.company.phase !== "paused" && rec.company.phase !== "out_of_budget") scheduler.resume(rec.company.id);
         break;
       }
       case "panic":
@@ -181,7 +199,20 @@ if (MODE === "fake") {
 // Found companies from companies/<slug>/company.md, now and whenever one appears.
 const known = new Set([...records.values()].map((r) => r.company.slug));
 watchCompanyFiles((file) => {
-  if (known.has(file.slug)) return;
+  if (known.has(file.slug)) {
+    // Existing company: pick up a budget change from the file (the usual way to top up).
+    const rec = [...records.values()].find((r) => r.company.slug === file.slug);
+    if (rec && (rec.company.budget.maxTurns !== file.input.maxTurns || rec.company.budget.maxTokens !== file.input.maxTokens)) {
+      rec.company.budget = { maxTurns: file.input.maxTurns, maxTokens: file.input.maxTokens };
+      if (rec.company.phase === "out_of_budget" && rec.company.spend.turns < rec.company.budget.maxTurns) {
+        town.emit({ ...ev(rec.company.id), type: "company_phase", phase: "building" });
+        scheduler.resume(rec.company.id);
+      }
+      registry.save(rec);
+      console.log(`[tokenvalley] ${file.input.name}: budget updated to ${file.input.maxTurns} turns`);
+    }
+    return;
+  }
   known.add(file.slug);
   try {
     found(file.input, file.slug);

@@ -199,7 +199,7 @@ export class FakeGenerator {
         this.town.emit({
           ...this.base(cid),
           type: "approval_resolved",
-          approval: { id: this.town.nextId("ap"), companyId: cid, summary: "Plan", status: approved ? "approved" : "rejected", founderComment: approved ? "Ship it." : "Too many blues." },
+          approval: { id: this.town.nextId("ap"), companyId: cid, kind: "plan", summary: "Plan", status: approved ? "approved" : "rejected", founderComment: approved ? "Ship it." : "Too many blues." },
         });
         this.approvalOpen.delete(cid);
       }
@@ -271,7 +271,7 @@ export class FakeGenerator {
       return;
     }
     if (roll < 0.91 && agent.role === "ceo" && company.phase !== "awaiting_approval") {
-      const approval = { id: this.town.nextId("ap"), companyId: cid, summary: "Plan v1: build the thing, then test the thing.", status: "pending" as const, founderComment: null };
+      const approval = { id: this.town.nextId("ap"), companyId: cid, kind: "plan" as const, summary: "Plan v1: build the thing, then test the thing.", status: "pending" as const, founderComment: null };
       this.town.emit({ ...this.base(cid), agentId: agent.id, type: "request_approval", approval });
       this.approvalOpen.add(cid);
       return;

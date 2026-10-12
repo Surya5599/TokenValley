@@ -168,9 +168,12 @@ export const Message = z.object({
 export type Message = z.infer<typeof Message>;
 
 export const ApprovalStatus = z.enum(["pending", "approved", "rejected"]);
+export const ApprovalKind = z.enum(["plan", "build", "ship"]);
+export type ApprovalKind = z.infer<typeof ApprovalKind>;
 export const Approval = z.object({
   id: z.string(),
   companyId: z.string(),
+  kind: ApprovalKind.default("plan"),
   summary: z.string(),
   status: ApprovalStatus,
   founderComment: z.string().nullable(),
@@ -257,7 +260,7 @@ export const FoundCompanyInput = z.object({
   rosterTemplate: z.string().default("startup"),
   modelOverrides: z.record(ModelTier).default({}),
   maxTurns: z.number().int().positive().default(100),
-  maxTokens: z.number().int().positive().default(1_000_000),
+  maxTokens: z.number().int().positive().default(5_000_000),
 });
 export type FoundCompanyInput = z.infer<typeof FoundCompanyInput>;
 
@@ -267,6 +270,8 @@ export const ClientMessage = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("focus_company"), companyId: z.string() }),
   z.object({ kind: z.literal("set_agent_model"), agentId: z.string(), model: ModelTier }),
   z.object({ kind: z.literal("resolve_approval"), approvalId: z.string(), status: ApprovalStatus, comment: z.string().nullable() }),
+  /** The founder talks to the CEO. The CEO is the only agent who hears the founder. */
+  z.object({ kind: z.literal("founder_message"), companyId: z.string(), text: z.string().min(1).max(2000) }),
   z.object({ kind: z.literal("pause_company"), companyId: z.string() }),
   z.object({ kind: z.literal("resume_company"), companyId: z.string() }),
   z.object({ kind: z.literal("panic") }),

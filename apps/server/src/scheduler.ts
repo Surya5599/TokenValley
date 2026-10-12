@@ -55,6 +55,17 @@ export class Scheduler {
     return this.running.size;
   }
 
+  /** A message from the founder lands in the CEO inbox and the CEO gets the next turn. */
+  founderMessage(rec: CompanyRecord, text: string): void {
+    const ceo = rec.agents.find((a) => a.role === "ceo");
+    if (!ceo) return;
+    const list = this.inbox.get(ceo.id) ?? [];
+    list.push({ id: this.town.nextId("msg"), companyId: rec.company.id, from: "founder", to: ceo.id, text, taskId: null, timestamp: Date.now() });
+    this.inbox.set(ceo.id, list);
+    this.lastTurnAt.set(ceo.id, 0);
+    this.idleRounds.delete(rec.company.id);
+  }
+
   /** Keep inboxes in sync from the event stream, whoever emitted the event. */
   private observe(e: Event): void {
     if (e.type === "send_message") {
@@ -66,6 +77,14 @@ export class Scheduler {
       const list = this.inbox.get(e.toAgentId) ?? [];
       list.push({ id: e.id, companyId: e.companyId, from: e.agentId, to: e.toAgentId, text: `Handoff of task ${e.taskId}: ${e.note}`, taskId: e.taskId, timestamp: e.timestamp });
       this.inbox.set(e.toAgentId, list);
+    } else if (e.type === "call_meeting") {
+      const caller = this.records.get(e.companyId)?.agents.find((a) => a.id === e.agentId);
+      for (const id of e.attendeeIds) {
+        if (id === e.agentId) continue;
+        const list = this.inbox.get(id) ?? [];
+        list.push({ id: `${e.id}_${id}`, companyId: e.companyId, from: e.agentId, to: id, text: `Meeting called by ${caller?.name ?? "a colleague"}: "${e.topic}". Give your one-line position.`, taskId: null, timestamp: e.timestamp });
+        this.inbox.set(id, list);
+      }
     } else if (e.type === "approval_resolved") {
       const rec = this.records.get(e.companyId);
       const ceo = rec?.agents.find((a) => a.role === "ceo");

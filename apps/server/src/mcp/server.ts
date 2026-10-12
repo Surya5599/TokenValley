@@ -86,8 +86,8 @@ server.tool(
 
 server.tool(
   "request_approval",
-  "Ask the founder to approve a plan, build, or release. Only the CEO should call this.",
-  { summary: z.string().max(1200) },
+  "Ask the founder to approve something. kind=plan after planning, kind=build when the first working version exists, kind=ship when the brief is fully done and QA has passed. Only the CEO should call this. The company pauses until the founder answers.",
+  { kind: z.enum(["plan", "build", "ship"]), summary: z.string().max(1200) },
   async (input) => {
     record("request_approval", input);
     return ok("Approval requested. The company pauses until the founder responds.");

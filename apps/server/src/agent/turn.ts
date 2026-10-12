@@ -121,13 +121,15 @@ function translate(opts: TurnOptions, name: string, input: Record<string, unknow
       case "call_meeting": {
         const roles = Array.isArray(input.attendees) ? (input.attendees as string[]) : [];
         const ids = roles.map((r) => agentByRole(record, r.toLowerCase())?.id).filter((x): x is string => !!x);
-        town.emit({ ...ev(town, cid), type: "call_meeting", agentId: agent.id, meetingId: town.nextId("mt"), attendeeIds: [agent.id, ...ids], topic: str("topic") });
+        const meetingId = town.nextId("mt");
+        town.emit({ ...ev(town, cid), type: "call_meeting", agentId: agent.id, meetingId, attendeeIds: [agent.id, ...ids], topic: str("topic") });
+        setTimeout(() => town.emit({ ...ev(town, cid), type: "meeting_ended", meetingId }), 25_000);
         break;
       }
       case "request_approval": {
         town.emit({
           ...ev(town, cid), type: "request_approval", agentId: agent.id,
-          approval: { id: town.nextId("ap"), companyId: cid, summary: str("summary"), status: "pending", founderComment: null },
+          approval: { id: town.nextId("ap"), companyId: cid, kind: (["plan", "build", "ship"].includes(str("kind")) ? str("kind") : "plan") as "plan" | "build" | "ship", summary: str("summary"), status: "pending", founderComment: null },
         });
         break;
       }
@@ -141,6 +143,12 @@ function translate(opts: TurnOptions, name: string, input: Record<string, unknow
         };
         record.agents.push(hire);
         town.emit({ ...ev(town, cid), type: "agent_spawned", agentId: hire.id, agent: hire });
+        const task: Task = {
+          id: town.nextId("task"), companyId: cid, title: str("task").slice(0, 120), ownerRole: role, ownerAgentId: hire.id,
+          status: "backlog", dependsOn: [], files: [], createdBy: agent.id,
+        };
+        record.tasks.push(task);
+        town.emit({ ...ev(town, cid), type: "task_created", task });
         break;
       }
       default:
@@ -218,13 +226,14 @@ export async function runAgentTurn(opts: TurnOptions): Promise<void> {
   if (result.sessionId) record.sessions[agent.id] = result.sessionId;
 
   const spend: Spend = {
-    turns: company.spend.turns + Math.max(1, result.numTurns),
-    inputTokens: company.spend.inputTokens + (result.usage.input_tokens ?? 0) + (result.usage.cache_read_input_tokens ?? 0) + (result.usage.cache_creation_input_tokens ?? 0),
+    turns: company.spend.turns + 1, // one agent turn, however many steps the CLI took inside it
+    // Cache reads are cheap and would dwarf everything else, so they are not counted against the cap.
+    inputTokens: company.spend.inputTokens + (result.usage.input_tokens ?? 0) + (result.usage.cache_creation_input_tokens ?? 0),
     outputTokens: company.spend.outputTokens + (result.usage.output_tokens ?? 0),
     estimatedUsd: +(company.spend.estimatedUsd + result.totalCostUsd).toFixed(4),
   };
-  const ratio = spend.turns / company.budget.maxTurns;
-  const prevRatio = company.spend.turns / company.budget.maxTurns;
+  const ratio = Math.max(spend.turns / company.budget.maxTurns, (spend.inputTokens + spend.outputTokens) / company.budget.maxTokens);
+  const prevRatio = Math.max(company.spend.turns / company.budget.maxTurns, (company.spend.inputTokens + company.spend.outputTokens) / company.budget.maxTokens);
   if (ratio >= 1) town.emit({ ...ev(town, cid), type: "budget_exhausted", spend, budget: company.budget });
   else if (ratio >= 0.8 && prevRatio < 0.8) town.emit({ ...ev(town, cid), type: "budget_warning", spend, budget: company.budget });
   else town.emit({ ...ev(town, cid), type: "spend_updated", spend });
