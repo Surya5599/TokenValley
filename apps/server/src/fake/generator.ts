@@ -29,13 +29,13 @@ type FakeCompanySpec = {
 
 const SPECS: FakeCompanySpec[] = [
   {
-    slug: "pied-prompter",
-    name: "Pied Prompter",
-    tagline: "Middle-out for your to-do list.",
+    slug: "scranton-software",
+    name: "Scranton Software",
+    tagline: "That is what she shipped.",
     brief: "Build a to-do list web app with local storage and a tidy UI.",
     palette: { primary: "#2fb37a", secondary: "#1f6f4e", accent: "#9be7c4", floor: "#2b2f36", wall: "#3b4350" },
     roster: ["ceo", "pm", "engineer", "qa", "designer", "cfo", "receptionist"],
-    names: { ceo: "Dana", pm: "Priya", engineer: "Milo", qa: "Quinn", designer: "Sasha", cfo: "Bernard", receptionist: "Rae" },
+    names: { ceo: "Michael", pm: "Jim", engineer: "Dwight", qa: "Angela", designer: "Pam", cfo: "Oscar", receptionist: "Erin" },
   },
   {
     slug: "dunder-mindflin",
@@ -44,16 +44,16 @@ const SPECS: FakeCompanySpec[] = [
     brief: "Build a CLI that turns markdown notes into a static site.",
     palette: { primary: "#4a7bd0", secondary: "#2f4f8a", accent: "#a9c4f5", floor: "#2a2b31", wall: "#4a4a58" },
     roster: ["ceo", "pm", "engineer", "qa", "cfo", "receptionist", "it"],
-    names: { ceo: "Michael", pm: "Pam", engineer: "Dwight", qa: "Angela", cfo: "Oscar", receptionist: "Erin", it: "Nick" },
+    names: { ceo: "David", pm: "Jan", engineer: "Darryl", qa: "Holly", cfo: "Kevin", receptionist: "Kelly", it: "Creed" },
   },
   {
-    slug: "hooli-ai",
-    name: "Hooli AI",
-    tagline: "Making the world a better place.",
+    slug: "sabre-labs",
+    name: "Sabre Labs",
+    tagline: "Printers that print. Mostly.",
     brief: "Build a landing page and pricing calculator for a SaaS product.",
     palette: { primary: "#e0533d", secondary: "#8f2f22", accent: "#ffb3a3", floor: "#2e2a2a", wall: "#5a4646" },
     roster: ["ceo", "pm", "engineer", "designer", "marketing", "cfo"],
-    names: { ceo: "Gavin", pm: "Jack", engineer: "Dinesh", designer: "Monica", marketing: "Jared", cfo: "Laurie" },
+    names: { ceo: "Robert", pm: "Andy", engineer: "Stanley", designer: "Phyllis", marketing: "Ryan", cfo: "Toby" },
   },
 ];
 

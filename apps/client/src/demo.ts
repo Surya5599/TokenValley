@@ -29,13 +29,13 @@ function company(id: string, name: string, tagline: string, plot: number, palett
 
 /** Demo personas: the comedic style block and the job block per role. */
 const STYLE: Partial<Record<RoleId, string>> = {
-  ceo: "Speaks entirely in buzzwords and never finishes a metaphor.\nCalls every meeting an all-hands. Thinks 'synergy' is a verb.",
-  pm: "Relentlessly cheerful. Turns every problem into a ticket, then a sub-ticket.\nEnds sentences with 'does that make sense?'",
-  engineer: "Dry, terse, allergic to adjectives.\nAnswers questions with file paths.",
-  qa: "Measures everything, trusts nothing. Pixel counts are a personality trait.\nQuietly delighted when something breaks.",
-  designer: "Talks about colours like they are people with feelings.\nRefuses to say 'blue'; it is 'the blue'.",
-  it: "Has restarted it. Will restart it again.\nSighs audibly over the network.",
-  intern: "Eager, overcaffeinated, asks 'is this normal?' about everything.",
+  ceo: "Wants to be your friend first and your boss second. Never finishes a metaphor.\nEvery meeting is secretly a party. Declares things by saying them loudly.",
+  pm: "Deadpan. Looks at the camera when something absurd happens.\nTurns every problem into a ticket, then quietly fixes it anyway.",
+  engineer: "Assistant to the regional engineer. Beets, bears, build systems.\nAnswers questions with file paths and a safety briefing.",
+  qa: "Judges everything, approves nothing. Pixel counts are a moral issue.\nKeeps a list. You are probably on it.",
+  designer: "Quietly the most competent person in the building.\nTalks about colours like they are people with feelings.",
+  it: "Has restarted it. Nobody is sure what else he does here.\nMay or may not have a desk.",
+  intern: "Eager, counts on his fingers, asks 'is this normal?' about everything.\nBrought chili once. Never again.",
 };
 const JOB: Partial<Record<RoleId, string>> = {
   ceo: "Owns the company brief and the plan. Talks to the founder, approves scope, calls meetings, and decides what ships.",
@@ -79,20 +79,20 @@ const B = "ledger-labs";
 const C = "null-pointer";
 
 const pf = {
-  ceo: agent("pf-ceo", A, "ceo", "Dana (CEO)"),
-  pm: agent("pf-pm", A, "pm", "Priya (PM)"),
-  eng: agent("pf-eng", A, "engineer", "Marco (Eng)", "working"),
-  qa: agent("pf-qa", A, "qa", "Lin (QA)"),
-  des: agent("pf-des", A, "designer", "Noor (Design)"),
-  it: agent("pf-it", A, "it", "Ravi (IT)"),
-  cfo: agent("pf-cfo", A, "cfo", "Gus (CFO)"),
-  rec: agent("pf-rec", A, "receptionist", "Mae (Front desk)"),
+  ceo: agent("pf-ceo", A, "ceo", "Michael (CEO)"),
+  pm: agent("pf-pm", A, "pm", "Jim (PM)"),
+  eng: agent("pf-eng", A, "engineer", "Dwight (Eng)", "working"),
+  qa: agent("pf-qa", A, "qa", "Angela (QA)"),
+  des: agent("pf-des", A, "designer", "Pam (Design)"),
+  it: agent("pf-it", A, "it", "Creed (IT)"),
+  cfo: agent("pf-cfo", A, "cfo", "Oscar (CFO)"),
+  rec: agent("pf-rec", A, "receptionist", "Erin (Front desk)"),
 };
 const ll = {
-  ceo: agent("ll-ceo", B, "ceo", "Theo (CEO)"),
-  pm: agent("ll-pm", B, "pm", "Ines (PM)"),
-  eng: agent("ll-eng", B, "engineer", "Kofi (Eng)", "working"),
-  qa: agent("ll-qa", B, "qa", "Sana (QA)"),
+  ceo: agent("ll-ceo", B, "ceo", "David (CEO)"),
+  pm: agent("ll-pm", B, "pm", "Jan (PM)"),
+  eng: agent("ll-eng", B, "engineer", "Darryl (Eng)", "working"),
+  qa: agent("ll-qa", B, "qa", "Holly (QA)"),
 };
 
 const tasksA: Task[] = [
@@ -114,8 +114,8 @@ export function demoSnapshot(): Extract<ServerMessage, { kind: "snapshot" }> {
     kind: "snapshot",
     town: { focusedCompanyId: A, poolSize: 3 },
     companies: [
-      company(A, "Pixel Forge", "We ship pixels.", 0, { primary: "#3d5a80", secondary: "#98c1d9", accent: "#ee6c4d", floor: "#d8c3a5", wall: "#e0fbfc" }),
-      company(B, "Ledger Labs", "Numbers, but friendly.", 1, { primary: "#386641", secondary: "#a7c957", accent: "#f2e8cf", floor: "#c9b79c", wall: "#f7f7f2" }),
+      company(A, "Dunder Mindflin", "Limitless paper in a paperless world.", 0, { primary: "#3d5a80", secondary: "#98c1d9", accent: "#ee6c4d", floor: "#d8c3a5", wall: "#e0fbfc" }),
+      company(B, "Sabre Labs", "Printers that print. Mostly.", 1, { primary: "#386641", secondary: "#a7c957", accent: "#f2e8cf", floor: "#c9b79c", wall: "#f7f7f2" }),
     ],
     agents: [...Object.values(pf), ...Object.values(ll)],
     tasks: [...tasksA, ...tasksB],
@@ -128,8 +128,8 @@ type EventFactory = () => Event | null;
 /** Builds the scripted sequence. `first` is true on the first loop only. */
 function buildScript(): EventFactory[] {
   const base = (companyId: string) => ({ id: nextId("evt"), companyId, timestamp: Date.now() });
-  const intern = agent("pf-intern", A, "intern", "Sam (Intern)");
-  const contractor: Agent = { ...agent("pf-helper", A, "engineer", "helper"), kind: "contractor", model: "haiku", parentAgentId: pf.eng.id };
+  const intern = agent("pf-intern", A, "intern", "Kevin (Intern)");
+  const contractor: Agent = { ...agent("pf-helper", A, "engineer", "Ryan (temp)"), kind: "contractor", model: "haiku", parentAgentId: pf.eng.id };
   const approval = { id: "pf-ap1", companyId: A, kind: "ship" as const, summary: "Ship landing page v1: nav fix, design tokens, smoke tests green. Merge to main?", status: "pending" as const, founderComment: null };
   const FOUNDER = "founder";
   const spendWarn = { turns: 165, inputTokens: 1_500_000, outputTokens: 310_000, estimatedUsd: 14.8 };
@@ -215,7 +215,7 @@ function buildScript(): EventFactory[] {
       return {
         ...base(C),
         type: "company_founded",
-        company: company(C, "Null Pointer Inc", "Everything is undefined.", 2, { primary: "#5a189a", secondary: "#9d4edd", accent: "#ffd60a", floor: "#cdb4db", wall: "#f1e4f3" }),
+        company: company(C, "Scott Paper Co.", "A paper company. In a closet.", 2, { primary: "#5a189a", secondary: "#9d4edd", accent: "#ffd60a", floor: "#cdb4db", wall: "#f1e4f3" }),
       };
     },
     () => ({ ...base(A), type: "agent_status", agentId: pf.qa.id, status: "idle", line: "Back from coffee" }),
@@ -223,8 +223,8 @@ function buildScript(): EventFactory[] {
       // The founder (or the script) rewrites the CEO's persona; alternates each loop.
       personaFlip = !personaFlip;
       return personaFlip
-        ? { ...base(A), type: "agent_persona_changed", agentId: pf.ceo.id, name: "Dana (CEO)", style: "Has discovered plain English. Suspicious of it.\nStill calls meetings all-hands.", job: JOB.ceo ?? "" }
-        : { ...base(A), type: "agent_persona_changed", agentId: pf.ceo.id, name: "Dana (CEO)", style: STYLE.ceo ?? "", job: JOB.ceo ?? "" };
+        ? { ...base(A), type: "agent_persona_changed", agentId: pf.ceo.id, name: "Michael (CEO)", style: "Has read one management book. Quotes it wrong.\nStill calls every meeting a surprise party.", job: JOB.ceo ?? "" }
+        : { ...base(A), type: "agent_persona_changed", agentId: pf.ceo.id, name: "Michael (CEO)", style: STYLE.ceo ?? "", job: JOB.ceo ?? "" };
     },
     () => ({ ...base(A), type: "post_message", agentId: pf.ceo.id, post: post(A, "general", pf.ceo.id, "Great synergy today, everyone. Let's take this offline. Online.") }),
     () => ({ ...base(A), type: "agent_retired", agentId: intern.id }),
