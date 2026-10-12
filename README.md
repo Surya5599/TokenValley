@@ -12,15 +12,15 @@ Runs on your own Claude Code subscription. No API keys.
 
 ## Status
 
-Early. See [docs/PLAN.md](docs/PLAN.md) for the full plan and phase gates.
+First working version. A company founded from a file built, tested, and shipped a to-do app end to end through the office, with the founder approving at the gate. See [docs/PLAN.md](docs/PLAN.md) for the full plan and phase gates.
 
 | Phase | State |
 | --- | --- |
 | 0 Spike: headless `claude` + orchestrator tool server | Done |
 | 1 Valley: 3D office, characters, pathfinding, fake events | Done |
 | 2 Real agents: file-based founding, CEO kickoff, turn scheduler | Done |
-| 3 Full cast, hires, workspace on a branch | In progress |
-| 4 Founder controls, gates, budgets | Not started |
+| 3 Full cast, hires, workspace on a branch | Mostly done (hires not yet exercised) |
+| 4 Founder controls, gates, budgets | Mostly done (approval gates, founder inbox, caps, top-ups, pause and panic) |
 | 5 Polish, replay, reports | Not started |
 
 ## Requirements
