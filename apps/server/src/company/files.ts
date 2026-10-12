@@ -104,6 +104,13 @@ export function watchCompanyFiles(onNew: (file: CompanyFile) => void): () => voi
   return () => watcher.close();
 }
 
+/** The whole team chat as a markdown transcript, next to the company file. */
+export function writeConversationFile(slug: string, company: Company, lines: string[]): void {
+  const dir = join(COMPANIES_DIR, slug);
+  if (!existsSync(dir)) return;
+  writeFileSync(join(dir, "conversation.md"), [`# ${company.name}: conversation`, ``, ...lines, ``].join("\n"));
+}
+
 /** Human-readable status next to the company file, for people who never open the UI. */
 export function writeStatusFile(slug: string, company: Company, lines: string[]): void {
   const dir = join(COMPANIES_DIR, slug);

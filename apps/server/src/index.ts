@@ -5,7 +5,7 @@ import { Town } from "./town.js";
 import { FakeGenerator } from "./fake/generator.js";
 import { CompanyRegistry, type CompanyRecord } from "./company/registry.js";
 import { foundCompany } from "./company/founder.js";
-import { watchCompanyFiles, writeStatusFile } from "./company/files.js";
+import { watchCompanyFiles, writeConversationFile, writeStatusFile } from "./company/files.js";
 import { runAgentTurn } from "./agent/turn.js";
 import { Scheduler } from "./scheduler.js";
 import { REPO_ROOT } from "./roles.js";
@@ -67,6 +67,25 @@ town.onMessage((m) => {
   if (e.type === "agent_status" || e.type === "spend_updated" || e.type === "task_done" || e.type === "request_approval" || e.type === "budget_exhausted") {
     const lines = town.events.filter((x) => x.companyId === e.companyId).map(describe).filter(Boolean).slice(-25);
     writeStatusFile(rec.company.slug, rec.company, lines);
+  }
+  if (e.type === "send_message" || e.type === "handoff" || e.type === "call_meeting" || e.type === "request_approval" || e.type === "approval_resolved") {
+    const name = (id: string) => (id === "founder" ? "Founder" : town.agents.get(id)?.name ?? id);
+    const stamp = (t: number) => new Date(t).toISOString().slice(11, 19);
+    const chat = town.events
+      .filter((x) => x.companyId === e.companyId)
+      .map((x) => {
+        switch (x.type) {
+          case "send_message": return `**${stamp(x.timestamp)} ${name(x.agentId)} → ${name(x.toAgentId)}:** ${x.message.text}`;
+          case "handoff": return `*${stamp(x.timestamp)} ${name(x.agentId)} handed ${x.taskId} to ${name(x.toAgentId)}: ${x.note}*`;
+          case "call_meeting": return `*${stamp(x.timestamp)} ${name(x.agentId)} called a meeting: ${x.topic}*`;
+          case "request_approval": return `**${stamp(x.timestamp)} ${name(x.agentId)} → Founder (${x.approval.kind} approval):** ${x.approval.summary}`;
+          case "approval_resolved": return `**${stamp(x.timestamp)} Founder:** ${x.approval.status.toUpperCase()}${x.approval.founderComment ? ` — ${x.approval.founderComment}` : ""}`;
+          default: return "";
+        }
+      })
+      .filter(Boolean)
+      .map((l) => `${l}\n`);
+    writeConversationFile(rec.company.slug, rec.company, chat);
   }
 });
 
