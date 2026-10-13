@@ -1894,3 +1894,10 @@ button.linkish:disabled {
   color: var(--muted);
   border-color: var(--muted);
 }
+
+/* ---- reel layout (?ui=reel): vertical recordings, no side panel ---- */
+body.reel .panel { display: none; }
+body.reel .feed { width: calc(100% - 32px); left: 16px; right: 16px; bottom: 16px; max-height: 26vh; font-size: 15px; }
+body.reel .feed .list { max-height: calc(26vh - 36px); }
+body.reel .topbar .menu, body.reel .topbar .controls { display: none; }
+body.reel .story-card { right: 16px; left: 16px; width: auto; }

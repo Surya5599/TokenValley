@@ -371,6 +371,8 @@ function bootstrap(): void {
     store.connection = "connected";
     if (storyMode) {
       document.body.classList.add("story");
+      // ?ui=reel hides the side panel for vertical (9:16) recordings.
+      if (new URLSearchParams(window.location.search).get("ui") === "reel") document.body.classList.add("reel");
       story = startStory({ store, director, rig, overlay, valley, overlayRoot, audio, handleMessage, setCamera, setLook });
     } else startDemo(handleMessage);
   }
