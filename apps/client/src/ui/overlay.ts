@@ -3,6 +3,8 @@ import { CHANNEL_FOUNDER, CHANNEL_GENERAL, FOUNDER_ID, type CameraMode, type Cha
 import { ROLE_COLOR } from "../world/character";
 
 export interface OverlayActions {
+  /** Sound engine toggles (View menu, speaker badge). */
+  audio: { readonly enabled: boolean; readonly musicEnabled: boolean; setEnabled: (on: boolean) => void; setMusic: (on: boolean) => void };
   focusCompany: (companyId: string) => void;
   selectAgent: (agentId: string) => void;
   setCamera: (mode: CameraMode) => void;
@@ -57,6 +59,8 @@ const SHORTCUTS: { keys: string[]; what: string }[] = [
   { keys: ["4"], what: "Meeting camera" },
   { keys: ["5"], what: "Walk (first person)" },
   { keys: ["Esc"], what: "Back to the office or valley; close menus and dialogs" },
+  { keys: ["M"], what: "Sound effects on or off" },
+  { keys: ["Shift", "M"], what: "Music on or off" },
   { keys: ["W", "A", "S", "D"], what: "Walk in first person; mouse to look; click to capture the mouse" },
   { keys: ["Drag"], what: "Orbit the camera" },
   { keys: ["Wheel"], what: "Zoom" },
@@ -250,6 +254,7 @@ export class Overlay {
   private readonly bell: HTMLButtonElement;
   private readonly bellCount: HTMLElement;
   private readonly conn: HTMLElement;
+  private readonly speaker: HTMLElement;
   private readonly panel: HTMLElement;
   private readonly feed: HTMLElement;
   private readonly feedList: HTMLElement;
@@ -335,6 +340,9 @@ export class Overlay {
     this.bell.append(this.bellCount);
     this.bell.addEventListener("click", () => this.openMenu("actions", true));
     top.append(this.bell);
+    this.speaker = el("div", "conn speaker muted", "muted");
+    this.speaker.title = "Sound (M). Toggle in the View menu.";
+    top.append(this.speaker);
     this.conn = el("div", "conn disconnected", "disconnected");
     top.append(this.conn);
     root.append(top);
@@ -763,6 +771,13 @@ export class Overlay {
         store.notify();
       },
     });
+    const audio = this.actions.audio;
+    items.push(
+      { divider: true },
+      { heading: "Sound" },
+      { label: "Sound effects", checked: audio.enabled, hint: "M", keepOpen: true, onSelect: () => audio.setEnabled(!audio.enabled) },
+      { label: "Music", checked: audio.musicEnabled, hint: "⇧M", keepOpen: true, onSelect: () => audio.setMusic(!audio.musicEnabled) },
+    );
     return items;
   }
 
@@ -1252,6 +1267,10 @@ export class Overlay {
     const store = this.store;
     this.renderMenus();
     this.feed.style.display = store.feedVisible ? "" : "none";
+    const audio = this.actions.audio;
+    const sound = audio.enabled ? (audio.musicEnabled ? "sound + music" : "sound on") : audio.musicEnabled ? "music only" : "muted";
+    this.speaker.className = `conn speaker ${audio.enabled || audio.musicEnabled ? "on" : "muted"}`;
+    this.speaker.textContent = sound;
     if (store.demo) {
       this.conn.className = "conn demo";
       this.conn.textContent = "demo";

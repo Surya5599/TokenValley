@@ -1689,3 +1689,16 @@ button.linkish:disabled {
 .story-wordmark.in {
   opacity: 1;
 }
+
+/* ---- speaker badge (sound engine) ---- */
+
+.conn.speaker.on {
+  background: rgba(124, 196, 255, 0.18);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.conn.speaker.muted {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  border-color: var(--muted);
+}

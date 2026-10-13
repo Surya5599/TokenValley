@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { FoundCompanyInput, ServerMessage } from "@tokenvalley/shared";
+import { createAudio } from "./audio/engine";
 import { startDemo } from "./demo";
 import { startStory, type Story } from "./story";
 import { WsClient } from "./net/ws";
@@ -7,6 +8,7 @@ import { Store, type CameraMode } from "./state/store";
 import { Overlay } from "./ui/overlay";
 import { CameraRig, type FirstPersonWorld } from "./world/camera";
 import { Director } from "./world/director";
+import { createPostFX, type FxQuality } from "./world/postfx";
 import { spotTile, tileToWorld } from "./world/office";
 import { skyTexture } from "./world/style";
 import { Valley } from "./world/valley";
@@ -31,8 +33,20 @@ function bootstrap(): void {
   store.demo = demoParam === "1" || demoParam === "story";
   const storyMode = demoParam === "story";
 
+  // Synthesized sound: effects on by default except when recording the story; music off by default.
+  const audio = createAudio({
+    defaultEffects: !storyMode,
+    roleOf: (id) => store.agents.get(id)?.role,
+    debug: import.meta.env.DEV && new URLSearchParams(window.location.search).has("audiodebug"),
+    onChange: () => store.notify(),
+  });
+  const resumeAudio = () => audio.resume();
+  window.addEventListener("pointerdown", resumeAudio, { passive: true });
+  window.addEventListener("keydown", resumeAudio);
+
   // ---- renderer and scene ----
-  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+  // No MSAA on the canvas: the post stack (SMAA) antialiases the composed frame instead.
+  const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NoToneMapping;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -46,9 +60,11 @@ function bootstrap(): void {
   scene.background = skyTexture();
   scene.fog = new THREE.Fog(0xf6f2f3, 110, 260);
 
-  const sky = new THREE.HemisphereLight(0xfff4ec, 0xf3c6d3, 1.5);
+  // Hemisphere trimmed a little so the near-white floor stops clipping and AO can show on it.
+  const sky = new THREE.HemisphereLight(0xfff4ec, 0xf3c6d3, 1.25);
   scene.add(sky);
-  const ambient = new THREE.AmbientLight(0xffe9f0, 0.7);
+  // Ambient sits a little lower than before so the screen-space AO has room to read.
+  const ambient = new THREE.AmbientLight(0xffe9f0, 0.5);
   scene.add(ambient);
   const sun = new THREE.DirectionalLight(0xfff1e0, 1.9);
   sun.position.set(30, 50, 25);
@@ -60,6 +76,10 @@ function bootstrap(): void {
   sun.shadow.normalBias = 0.02;
   sun.shadow.radius = 3;
   scene.add(sun);
+  // Cool fill from the opposite side lifts the shadow sides without a second shadow map.
+  const fill = new THREE.DirectionalLight(0xdfe8ff, 0.5);
+  fill.position.set(-26, 22, -30);
+  scene.add(fill);
   /** Tight shadow frustum in the office, wide over the whole valley. */
   const fitShadows = (valleyView: boolean) => {
     const s = valleyView ? 88 : 26;
@@ -76,9 +96,23 @@ function bootstrap(): void {
   scene.add(valley.group);
   const director = new Director(scene, store, { sun, sky });
   const rig = new CameraRig(window.innerWidth / window.innerHeight);
-  rig.camera.fov = 35;
+  // A narrow lens in the overview modes flattens perspective, which is half of the miniature look.
+  const FOV: Record<CameraMode, number> = { valley: 30, office: 30, follow: 35, meeting: 35, firstperson: 35 };
+  let targetFov = FOV.valley;
+  rig.camera.fov = targetFov;
   rig.camera.updateProjectionMatrix();
   rig.attach(renderer.domElement);
+
+  // ---- post-processing ----
+  const fx = createPostFX(renderer, scene, rig.camera);
+  fx.resize(window.innerWidth, window.innerHeight);
+  const QUALITIES: FxQuality[] = ["high", "medium", "low"];
+  let qualityPinned = false;
+  const setQuality = (q: FxQuality, pinned: boolean) => {
+    qualityPinned = pinned;
+    fx.setQuality(q);
+    console.info(`[postfx] quality: ${q}`);
+  };
   rig.followTarget = () => director.characterPosition(store.selectedAgentId);
 
   const ws = store.demo ? null : new WsClient(WS_URL);
@@ -136,6 +170,8 @@ function bootstrap(): void {
   const enterOfficeFirstPerson = (companyId: string) => {
     focusCompany(companyId, false, true);
     fpContext = "office";
+    fx.setMode("firstperson");
+    targetFov = FOV.firstperson;
     const entrance = spotTile("entrance") ?? { x: 1, z: 14 };
     // Stand on the entrance tile looking into the office (+x).
     rig.enterFirstPerson(tileToWorld(entrance), -Math.PI / 2, officeWorld());
@@ -146,6 +182,8 @@ function bootstrap(): void {
 
   const enterValleyFirstPerson = () => {
     fpContext = "valley";
+    fx.setMode("firstperson");
+    targetFov = FOV.firstperson;
     const p = (store.focusedCompanyId ? valley.buildingPosition(store.focusedCompanyId) : null) ?? new THREE.Vector3();
     // On the road in front of the focused building, facing it (-z).
     rig.enterFirstPerson(new THREE.Vector3(p.x, 0, p.z + 10), 0, valleyWorld());
@@ -168,6 +206,8 @@ function bootstrap(): void {
     }
     if ((mode === "office" || mode === "follow" || mode === "meeting") && !store.focusedCompanyId) mode = "valley";
     store.cameraMode = mode;
+    fx.setMode(mode);
+    targetFov = FOV[mode];
     rig.meetingCenter.copy(director.meetingCenter());
     rig.setMode(mode);
     applyVisibility();
@@ -197,6 +237,7 @@ function bootstrap(): void {
   };
 
   const overlay = new Overlay(overlayRoot, store, {
+    audio,
     focusCompany: (id) => focusCompany(id, false),
     selectAgent: (id) => {
       store.selectedAgentId = id;
@@ -288,6 +329,7 @@ function bootstrap(): void {
         break;
       case "event":
         store.applyEvent(m.event);
+        audio.handleEvent(m.event, m.event.companyId === store.focusedCompanyId);
         if (m.event.type === "company_founded" && !store.focusedCompanyId) focusCompany(m.event.company.id);
         director.handle(m.event);
         valley.sync(store);
@@ -359,6 +401,16 @@ function bootstrap(): void {
       case "5":
         setCamera("firstperson");
         break;
+      case "0": {
+        const next = QUALITIES[(QUALITIES.indexOf(fx.quality()) + 1) % QUALITIES.length] ?? "medium";
+        setQuality(next, true);
+        break;
+      }
+      case "m":
+      case "M":
+        if (e.shiftKey) audio.setMusic(!audio.musicEnabled);
+        else audio.setEnabled(!audio.enabled);
+        break;
       case "Escape":
         // Menus and dialogs first, topmost wins; only then does Esc move the camera.
         if (overlay.handleEscape()) break;
@@ -370,27 +422,84 @@ function bootstrap(): void {
 
   // ---- resize ----
   window.addEventListener("resize", () => {
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    // The composer sizes the renderer and all of its buffers together.
+    fx.resize(window.innerWidth, window.innerHeight);
     rig.resize(window.innerWidth / window.innerHeight);
   });
 
   // ---- main loop: fixed-ish delta, scaled by the animation speed ----
   const clock = new THREE.Clock();
+  // The composer renders several passes per frame, so draw-call stats are reset here, once per frame.
+  renderer.info.autoReset = false;
+  // Outline selection: the character meshes currently in the office. Rebuilt when the cast changes
+  // and on a slow timer, because characters swap body parts without telling anyone.
+  let outlineKey = "";
+  let outlineTimer = 0;
+  const refreshOutline = (raw: number) => {
+    outlineTimer -= raw;
+    const key = [...director.characters.keys()].join(",");
+    if (key === outlineKey && outlineTimer > 0) return;
+    outlineKey = key;
+    outlineTimer = 1.5;
+    fx.setOutlineSelection([...director.characters.values()].map((ch) => ch.group));
+  };
+  // Bloom selection: only meshes that are emissive right now (monitors glow for a couple of
+  // seconds) or unlit basic-material props (alarm, rack LEDs). Refreshed a few times a second.
+  let bloomTimer = 0;
+  const bloomMeshes: THREE.Object3D[] = [];
+  const refreshBloom = (raw: number) => {
+    bloomTimer -= raw;
+    if (bloomTimer > 0) return;
+    bloomTimer = 0.25;
+    bloomMeshes.length = 0;
+    director.office?.group.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh || (mesh as unknown as THREE.Sprite).isSprite) return;
+      const mat = mesh.material as THREE.MeshToonMaterial | THREE.MeshBasicMaterial;
+      if (Array.isArray(mat) || mat.transparent) return;
+      const emissive = (mat as THREE.MeshToonMaterial).emissive;
+      if ((emissive && (emissive.r > 0 || emissive.g > 0 || emissive.b > 0)) || (mat as THREE.MeshBasicMaterial).isMeshBasicMaterial) bloomMeshes.push(mesh);
+    });
+    fx.setBloomSelection(bloomMeshes);
+  };
+  // Frame-time probe: drop to low quality if the first seconds run under 45 fps.
+  let probeFrames = 0;
+  let probeSeconds = 0;
+  let probeDone = false;
+  const probe = (raw: number) => {
+    if (probeDone) return;
+    probeFrames++;
+    probeSeconds += raw;
+    if (probeSeconds < 3) return;
+    probeDone = true;
+    const fps = probeFrames / probeSeconds;
+    if (!qualityPinned && fps < 45) setQuality("low", false);
+    else console.info(`[postfx] probe: ${fps.toFixed(0)} fps, keeping ${fx.quality()}`);
+  };
   const tick = () => {
     const raw = Math.min(0.05, clock.getDelta());
     const dt = raw * store.speed;
     story?.update(dt);
+    audio.update(raw);
     director.update(dt);
     valley.update(dt);
     rig.update(raw);
-    renderer.render(scene, rig.camera);
+    if (Math.abs(rig.camera.fov - targetFov) > 0.01) {
+      rig.camera.fov += (targetFov - rig.camera.fov) * (1 - Math.exp(-raw * 4));
+      rig.camera.updateProjectionMatrix();
+    }
+    refreshOutline(raw);
+    refreshBloom(raw);
+    renderer.info.reset();
+    fx.render(raw);
+    probe(raw);
     requestAnimationFrame(tick);
   };
   applyVisibility();
   requestAnimationFrame(tick);
 
   // Debug hook for driving the client from the console or scripts.
-  (window as unknown as { tokenvalley: unknown }).tokenvalley = { store, rig, director, valley, overlay, renderer, setCamera, focusCompany, handleMessage, story };
+  (window as unknown as { tokenvalley: unknown }).tokenvalley = { store, rig, director, valley, overlay, renderer, fx, setCamera, focusCompany, handleMessage, story, audio };
 }
 
 bootstrap();

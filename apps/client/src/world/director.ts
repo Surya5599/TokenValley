@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { HOME_SPOTS, ROLE_HOME, type Agent, type AgentStatus, type AnimState, type Event, type RoleId } from "@tokenvalley/shared";
 import { FOUNDER_ID, type Store } from "../state/store";
-import { Character } from "./character";
+import { Character, type Expression } from "./character";
 import { Office, spotTile, type Tile } from "./office";
 import { isWalkable, nearestWalkable, tileDistance } from "./pathfinding";
 
@@ -12,6 +12,17 @@ export interface SceneLights {
 
 const FAR_TILES = 6;
 const INCIDENT_DAY_SECONDS = 15;
+const JIM_LOOK_COOLDOWN = 20;
+const DEV_POD_ROLES: RoleId[] = ["engineer", "backend", "frontend"];
+
+/** A quick read of a message's mood, for the sender's face. */
+function sentiment(text: string): Expression | null {
+  const t = text.toLowerCase();
+  if (/\b(bug|blocked|fail|failed|failing|broken|no)\b/.test(t)) return "frown";
+  if (/\bthanks?\b|thank you|!/.test(t)) return "smile";
+  if (t.includes("?")) return "surprised";
+  return null;
+}
 
 function baseName(path: string): string {
   const parts = path.split(/[\\/]/);
@@ -53,6 +64,7 @@ export class Director {
   private time = 0;
   private dimmed = false;
   private idleToggle = false;
+  private lastJimLook = -Infinity;
   private readonly baseIntensity: { sun: number; sky: number };
 
   constructor(
@@ -188,17 +200,30 @@ export class Director {
       case "task_blocked": {
         const ch = this.characters.get(e.agentId);
         if (!ch) break;
-        ch.setState("blocked");
+        // A facepalm first, then the blocked slump.
+        ch.gesture("facepalm");
+        ch.setExpression("frown", 5);
         ch.say(e.reason, 4);
-        const blocker = this.byRole(e.blockedByRole);
-        if (blocker && blocker !== ch) {
-          void ch.goTo(this.adjacentTo(blocker.tile, ch.tile), "blocked", blocker.tile).then((ok) => {
-            if (!ok) return;
-            ch.say(e.reason, 4);
-            blocker.say("On it.", 2);
-            this.later(3, () => void ch.goTo(this.homeSpotId(ch.agent), "blocked"));
-          });
-        }
+        this.later(1.3, () => {
+          if (ch.removed) return;
+          ch.setState("blocked");
+          const blocker = this.byRole(e.blockedByRole);
+          if (blocker && blocker !== ch) {
+            ch.lookAt(blocker);
+            void ch.goTo(this.adjacentTo(blocker.tile, ch.tile), "blocked", blocker.tile).then((ok) => {
+              if (!ok) return;
+              ch.say(e.reason, 4);
+              blocker.say("On it.", 2);
+              blocker.lookAt(ch);
+              blocker.nod();
+              this.later(3, () => {
+                blocker.lookAt(null);
+                ch.lookAt(null);
+                void ch.goTo(this.homeSpotId(ch.agent), "blocked");
+              });
+            });
+          }
+        });
         this.syncBoard();
         break;
       }
@@ -208,6 +233,7 @@ export class Director {
           const title = this.store.tasks.get(e.taskId)?.title ?? "Done";
           ch.say(`Done: ${title}`, 3);
           ch.setState("celebrate");
+          ch.setExpression("big_smile", 3);
         }
         this.syncBoard();
         break;
@@ -248,6 +274,7 @@ export class Director {
           const ceo = this.characters.get(e.toAgentId) ?? this.byRole("ceo");
           if (ceo) {
             ceo.say(`Founder: ${e.message.text}`, 5);
+            this.react(ceo, e.message.text);
             if (!ceo.isMoving) {
               const prev = this.currentState(ceo);
               ceo.setState("talk");
@@ -263,10 +290,12 @@ export class Director {
           const ceo = this.characters.get(e.agentId) ?? this.byRole("ceo");
           if (!ceo) break;
           ceo.say(e.message.text, 4);
+          this.react(ceo, e.message.text);
           const home = this.homeSpotId(ceo.agent);
           void ceo.goTo(office.bellSpot, "talk", office.faceTiles.get("bell") ?? null).then((ok) => {
             if (!ok) return;
             ceo.say(e.message.text, 5);
+            ceo.gesture("leanIn");
             this.later(4, () => void ceo.goTo(home, this.currentState(ceo)));
           });
           break;
@@ -275,12 +304,17 @@ export class Director {
         const recipient = this.characters.get(e.toAgentId);
         if (!sender) break;
         sender.say(e.message.text, 4);
+        this.react(sender, e.message.text);
+        if (recipient && recipient !== sender) this.exchangeLooks(sender, recipient, 4.5);
+        this.maybeJimLook(sender, e.message.text);
         if (recipient && recipient !== sender && tileDistance(sender.tile, recipient.tile) > FAR_TILES) {
           const home = this.homeSpotId(sender.agent);
           void sender.goTo(this.adjacentTo(recipient.tile, sender.tile), "talk", recipient.tile).then((ok) => {
             if (!ok) return;
             sender.say(e.message.text, 4);
+            this.exchangeLooks(sender, recipient, 3.5);
             recipient.setState("talk");
+            recipient.nod();
             this.later(3, () => {
               this.restoreState(recipient);
               void sender.goTo(home, this.currentState(sender));
@@ -301,6 +335,17 @@ export class Director {
         const ch = this.characters.get(e.agentId);
         if (!ch) break;
         ch.say(e.post.text, 4);
+        this.react(ch, e.post.text);
+        this.maybeJimLook(ch, e.post.text);
+        if (e.post.channel !== "general") {
+          // Everyone else at the table looks at whoever is talking.
+          for (const other of this.characters.values()) {
+            if (other !== ch && this.seatOf(other.agent.id)) {
+              other.lookAt(ch);
+              this.later(4, () => other.lookAt(null));
+            }
+          }
+        }
         const inMeeting = e.post.channel !== "general" && this.seatOf(e.agentId) !== null;
         if (!inMeeting && !ch.isMoving && ch.state !== "celebrate") {
           const prev = this.currentState(ch);
@@ -336,6 +381,8 @@ export class Director {
           if (!ok) return;
           sender.say(e.note, 4);
           recipient?.say("Got it.", 2);
+          recipient?.nod();
+          if (recipient) this.exchangeLooks(sender, recipient, 3);
           this.later(2.5, () => void sender.goTo(home, this.currentState(sender)));
         });
         this.syncBoard();
@@ -370,8 +417,16 @@ export class Director {
         office.flashAlarm(4);
         office.setIncidentDays(0);
         this.byRole("qa")?.say(`Build failed: ${e.summary}`, 4);
+        this.byRole("qa")?.setExpression("frown", 4);
+        for (const ch of this.characters.values()) {
+          if (DEV_POD_ROLES.includes(ch.agent.role) && ch.agent.kind !== "contractor") {
+            ch.gesture("headShake");
+            ch.setExpression("frown", 3);
+          }
+        }
         const it = this.byRole("it");
         if (it) {
+          it.gesture("shrug");
           void it.goTo(office.closetSpot, "idle", office.faceTiles.get("server_closet") ?? null).then((ok) => {
             if (!ok) return;
             it.say("Restart it.", 3);
@@ -384,7 +439,8 @@ export class Director {
         const qa = this.byRole("qa") ?? this.byRole("engineer");
         if (qa) {
           qa.say(`Build passed: ${e.summary}`, 3);
-          if (!qa.isMoving) qa.setState("celebrate");
+          qa.gesture("thumbsUp");
+          qa.setExpression("big_smile", 3);
         }
         break;
       }
@@ -428,6 +484,7 @@ export class Director {
         void ceo.goTo(office.bellSpot, "idle", office.faceTiles.get("bell") ?? null).then((ok) => {
           if (!ok) return;
           office.ringBell();
+          ceo.gesture("leanIn");
           ceo.say(e.approval.summary, 8);
         });
         break;
@@ -437,7 +494,13 @@ export class Director {
         if (!ceo) break;
         const verdict = e.approval.status === "approved" ? "Approved!" : e.approval.status === "rejected" ? `Rejected: ${e.approval.founderComment ?? "no comment"}` : "Pending...";
         ceo.say(verdict, 4);
-        if (e.approval.status === "approved") ceo.setState("celebrate");
+        if (e.approval.status === "approved") {
+          ceo.setState("celebrate");
+          ceo.setExpression("big_smile", 3);
+        } else if (e.approval.status === "rejected") {
+          ceo.gesture("shrug");
+          this.later(0.7, () => ceo.setExpression("frown", 4));
+        }
         this.later(1.5, () => void ceo.goTo(this.homeSpotId(ceo.agent), this.currentState(ceo)));
         break;
       }
@@ -487,6 +550,35 @@ export class Director {
 
   private later(seconds: number, fn: () => void): void {
     this.timers.push({ at: this.time + seconds, fn });
+  }
+
+  /** The sender's face reacts to what they just said, briefly, before the talking mouth takes over. */
+  private react(ch: Character, text: string): void {
+    const e = sentiment(text);
+    if (e) ch.setExpression(e, e === "surprised" ? 0.9 : 1.4);
+  }
+
+  /** Two characters look at each other for `seconds`, then let go. */
+  private exchangeLooks(a: Character, b: Character, seconds: number): void {
+    a.lookAt(b);
+    b.lookAt(a);
+    this.later(seconds, () => {
+      if (!a.removed) a.lookAt(null);
+      if (!b.removed) b.lookAt(null);
+    });
+  }
+
+  /** After CEO buzzwords, one nearby colleague gives the camera a look. At most once per 20 s. */
+  private maybeJimLook(speaker: Character, text: string): void {
+    if (speaker.agent.role !== "ceo" || !/synergy|all-hands/i.test(text)) return;
+    if (this.time - this.lastJimLook < JIM_LOOK_COOLDOWN) return;
+    const nearby = [...this.characters.values()].filter((c) => c !== speaker && c.agent.kind !== "contractor" && !c.isMoving && tileDistance(c.tile, speaker.tile) <= 8);
+    const pick = nearby[Math.floor(Math.random() * nearby.length)];
+    if (!pick) return;
+    this.lastJimLook = this.time;
+    this.later(1.0, () => {
+      if (!pick.removed) pick.gesture("lookAtCamera");
+    });
   }
 
   private incidentDays(companyId: string): number {
