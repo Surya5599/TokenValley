@@ -58,6 +58,7 @@ export const AnimState = z.enum([
   "coffee",
   "arrive",
   "leave",
+  "wave",
 ]);
 export type AnimState = z.infer<typeof AnimState>;
 

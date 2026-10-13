@@ -777,6 +777,13 @@ export class Overlay {
           window.location.search = "?demo=1";
         },
       },
+      {
+        label: "Play story (for recording)",
+        title: "Reload with ?demo=story: a 130 second scripted storyline with camera moves (press P to hide the progress line)",
+        onSelect: () => {
+          window.location.search = "?demo=story";
+        },
+      },
       { divider: true },
       { label: "About TokenValley", onSelect: () => this.openAbout() },
     ];

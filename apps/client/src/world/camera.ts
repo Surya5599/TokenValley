@@ -14,6 +14,18 @@ interface Framing {
 
 type OrbitMode = Exclude<CameraMode, "firstperson">;
 
+/** A scripted camera move: tweens the orbit framing over a fixed time, then holds (and keeps tracking a live target). */
+interface Cinematic {
+  from: Framing;
+  radius: number;
+  elevation: number;
+  azimuth: number;
+  target: THREE.Vector3 | (() => THREE.Vector3 | null);
+  elapsed: number;
+  duration: number;
+  ease: "smooth" | "linear";
+}
+
 const PRESETS: Record<OrbitMode, Omit<Framing, "target">> = {
   valley: { radius: 125, elevation: 0.78, azimuth: 0.6 },
   office: { radius: 40, elevation: 0.9, azimuth: 0.62 },
@@ -55,6 +67,7 @@ export class CameraRig {
   private dragDistance = 0;
   private readonly tmp = new THREE.Vector3();
   private el: HTMLElement | null = null;
+  private cine: Cinematic | null = null;
 
   // First person state.
   private readonly fpPos = new THREE.Vector3();
@@ -72,6 +85,7 @@ export class CameraRig {
   setMode(mode: CameraMode, snap = false): void {
     const wasFp = this.mode === "firstperson";
     this.mode = mode;
+    this.cine = null;
     if (mode === "firstperson") return;
     if (wasFp && document.pointerLockElement === this.el) document.exitPointerLock();
     const p = PRESETS[mode];
@@ -87,6 +101,28 @@ export class CameraRig {
       this.current.azimuth = this.desired.azimuth;
       this.apply();
     }
+  }
+
+  /**
+   * Scripted move for story mode: tweens from the current framing to the
+   * given one over `seconds` (0 snaps), then holds there. A function target
+   * keeps being tracked after the tween, like follow mode. Any setMode cancels it.
+   */
+  cinematicTo(target: THREE.Vector3 | (() => THREE.Vector3 | null), radius: number, elevation: number, azimuth: number, seconds: number, ease: "smooth" | "linear" = "smooth"): void {
+    if (this.mode === "firstperson") return;
+    const from: Framing = { target: this.current.target.clone(), radius: this.current.radius, elevation: this.current.elevation, azimuth: this.current.azimuth };
+    this.cine = { from, radius, elevation, azimuth, target, elapsed: 0, duration: Math.max(0, seconds), ease };
+    if (seconds <= 0) this.updateCinematic(0);
+  }
+
+  /** Whether a scripted move is driving the camera. */
+  get isCinematic(): boolean {
+    return this.cine !== null;
+  }
+
+  /** Hands the camera back to the current mode's framing. */
+  endCinematic(): void {
+    this.cine = null;
   }
 
   /** Enters first-person at a world position with a yaw (0 looks down -z). */
@@ -196,6 +232,10 @@ export class CameraRig {
       this.applyFirstPerson();
       return;
     }
+    if (this.cine) {
+      this.updateCinematic(dt);
+      return;
+    }
     this.updateTarget();
     // Exponential smoothing gives a soft tween regardless of frame rate.
     const k = 1 - Math.exp(-dt * 4.5);
@@ -205,6 +245,28 @@ export class CameraRig {
     let da = this.desired.azimuth - this.current.azimuth;
     da = Math.atan2(Math.sin(da), Math.cos(da));
     this.current.azimuth += da * k;
+    this.apply();
+  }
+
+  private updateCinematic(dt: number): void {
+    const c = this.cine;
+    if (!c) return;
+    c.elapsed += dt;
+    const k = c.duration <= 0 ? 1 : Math.min(1, c.elapsed / c.duration);
+    const e = c.ease === "linear" ? k : k * k * (3 - 2 * k);
+    const dest = typeof c.target === "function" ? (c.target() ?? c.from.target) : c.target;
+    if (typeof c.target === "function") this.tmp.copy(dest).add(new THREE.Vector3(0, 0.8, 0));
+    else this.tmp.copy(dest);
+    this.current.target.lerpVectors(c.from.target, this.tmp, e);
+    this.current.radius = c.from.radius + (c.radius - c.from.radius) * e;
+    this.current.elevation = c.from.elevation + (c.elevation - c.from.elevation) * e;
+    let da = c.azimuth - c.from.azimuth;
+    da = Math.atan2(Math.sin(da), Math.cos(da));
+    this.current.azimuth = c.from.azimuth + da * e;
+    // Keep the mode's desired framing in step so ending the cinematic does not snap back.
+    this.desired.radius = this.current.radius;
+    this.desired.elevation = this.current.elevation;
+    this.desired.azimuth = this.current.azimuth;
     this.apply();
   }
 

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { FoundCompanyInput, ServerMessage } from "@tokenvalley/shared";
 import { startDemo } from "./demo";
+import { startStory, type Story } from "./story";
 import { WsClient } from "./net/ws";
 import { Store, type CameraMode } from "./state/store";
 import { Overlay } from "./ui/overlay";
@@ -25,7 +26,10 @@ function bootstrap(): void {
   if (!app || !overlayRoot) throw new Error("missing #app or #overlay");
 
   const store = new Store();
-  store.demo = new URLSearchParams(window.location.search).get("demo") === "1";
+  // ?demo=1 is the looping demo; ?demo=story is the timed storyline for recording.
+  const demoParam = new URLSearchParams(window.location.search).get("demo");
+  store.demo = demoParam === "1" || demoParam === "story";
+  const storyMode = demoParam === "story";
 
   // ---- renderer and scene ----
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -307,6 +311,7 @@ function bootstrap(): void {
     }
   };
 
+  let story: Story | null = null;
   if (ws) {
     ws.onMessage(handleMessage);
     ws.onStatus((s) => {
@@ -316,7 +321,10 @@ function bootstrap(): void {
     ws.connect();
   } else {
     store.connection = "connected";
-    startDemo(handleMessage);
+    if (storyMode) {
+      document.body.classList.add("story");
+      story = startStory({ store, director, rig, overlay, valley, overlayRoot, handleMessage, setCamera });
+    } else startDemo(handleMessage);
   }
 
   // ---- picking buildings on the valley map ----
@@ -371,6 +379,7 @@ function bootstrap(): void {
   const tick = () => {
     const raw = Math.min(0.05, clock.getDelta());
     const dt = raw * store.speed;
+    story?.update(dt);
     director.update(dt);
     valley.update(dt);
     rig.update(raw);
@@ -381,7 +390,7 @@ function bootstrap(): void {
   requestAnimationFrame(tick);
 
   // Debug hook for driving the client from the console or scripts.
-  (window as unknown as { tokenvalley: unknown }).tokenvalley = { store, rig, director, valley, overlay, renderer, setCamera, focusCompany, handleMessage };
+  (window as unknown as { tokenvalley: unknown }).tokenvalley = { store, rig, director, valley, overlay, renderer, setCamera, focusCompany, handleMessage, story };
 }
 
 bootstrap();

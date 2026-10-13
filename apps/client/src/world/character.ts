@@ -2,7 +2,7 @@ import * as THREE from "three";
 import type { Agent, AnimState, ModelTier, RoleId } from "@tokenvalley/shared";
 import { spotTile, tileToWorld, type Office, type Tile } from "./office";
 import { findPath, nearestWalkable } from "./pathfinding";
-import { PASTEL, toonMat } from "./style";
+import { PASTEL, pastel, toonMat } from "./style";
 import { canvasTexture, disposeSprite, makeCanvas, roundRect, wrapText } from "./textures";
 
 /** Pastel outfit per role; also used by the overlay for chat avatars. */
@@ -28,6 +28,84 @@ const MODEL_BADGE: Record<ModelTier, { label: string; color: string }> = {
   sonnet: { label: "SONNET", color: "#3b82f6" },
   haiku: { label: "HAIKU", color: "#22c55e" },
 };
+
+
+// ---- looks -------------------------------------------------------------------
+
+export type HairShape = "short" | "side_part" | "centre_part" | "ponytail" | "bob" | "bald" | "fringe" | "curly" | "slicked" | "messy" | "bun" | "long" | "shoulder" | "thin" | "cap";
+export type TopKind = "jacket" | "shirt" | "cardigan" | "vest" | "sweater" | "polo" | "warehouse" | "dress";
+export type PropKind = "calculator_watch" | "cat_pin" | "crossword" | "mug" | "clipboard" | "badge" | "pen" | null;
+
+/** Everything that makes one cast member read as themselves. Built from primitives; no textures, no text. */
+export interface Look {
+  skin: number;
+  hair: { shape: HairShape; color: number };
+  /** 0.9 .. 1.15 */
+  height: number;
+  /** 0.9 .. 1.3 */
+  width: number;
+  /** `shirt` is the layer under a jacket, cardigan or vest. */
+  top: { kind: TopKind; color: number; shirt?: number };
+  bottom: number;
+  tie: number | null;
+  tieStyle?: "loose" | "skinny";
+  glasses: boolean;
+  prop: PropKind;
+  smile?: "warm" | "big";
+  /** Resting head tilt: x nods forward, z leans sideways. */
+  headTilt?: { x?: number; z?: number };
+  /** Shoulders drop and the arms hang a little lower. */
+  slump?: boolean;
+}
+
+const SKIN_LIGHT = 0xf6d8c0;
+const SKIN_FAIR = 0xf1c27d;
+const SKIN_TAN = 0xd9a877;
+const SKIN_BROWN = 0xa5693f;
+const SKIN_DEEP = 0x6f4426;
+const WHITE_SHIRT = 0xf7f5f2;
+const INK = PASTEL.ink;
+
+/** The cast, keyed by lowercase first name. Any name not here falls back to the role outfit. */
+export const LOOKS: Record<string, Look> = {
+  michael: { skin: SKIN_FAIR, hair: { shape: "side_part", color: 0x4a3728 }, height: 1.0, width: 1.0, top: { kind: "jacket", color: 0x4b4a5e, shirt: WHITE_SHIRT }, bottom: 0x3f3e52, tie: 0xd62828, glasses: false, prop: null, smile: "big" },
+  jim: { skin: SKIN_LIGHT, hair: { shape: "messy", color: 0x6b4a2f }, height: 1.12, width: 0.95, top: { kind: "shirt", color: WHITE_SHIRT }, bottom: 0x5c6b8a, tie: 0x6b7fa3, tieStyle: "loose", glasses: false, prop: null, smile: "warm" },
+  pam: { skin: SKIN_LIGHT, hair: { shape: "ponytail", color: 0x6b4a2f }, height: 0.97, width: 0.92, top: { kind: "cardigan", color: 0xc9b8e8, shirt: 0xfbf1e3 }, bottom: 0x8d99ae, tie: null, glasses: false, prop: null, smile: "warm" },
+  dwight: { skin: SKIN_FAIR, hair: { shape: "centre_part", color: 0x6b4a2f }, height: 1.02, width: 1.0, top: { kind: "shirt", color: 0xd9a441 }, bottom: 0x8a6f4d, tie: INK, glasses: true, prop: "calculator_watch" },
+  angela: { skin: SKIN_LIGHT, hair: { shape: "bun", color: 0xf0d78c }, height: 0.9, width: 0.9, top: { kind: "shirt", color: 0xd6e8ff }, bottom: 0x6b6b7e, tie: null, glasses: false, prop: "cat_pin" },
+  kevin: { skin: SKIN_FAIR, hair: { shape: "fringe", color: 0x7a5a3a }, height: 1.0, width: 1.3, top: { kind: "shirt", color: 0xdde6f2 }, bottom: 0x4f5566, tie: 0x6fa3d8, glasses: false, prop: null, smile: "warm" },
+  oscar: { skin: SKIN_TAN, hair: { shape: "short", color: 0x2b1d14 }, height: 1.0, width: 0.95, top: { kind: "vest", color: 0x8fa3bf, shirt: WHITE_SHIRT }, bottom: 0x5c6b8a, tie: null, glasses: false, prop: "pen" },
+  stanley: { skin: SKIN_DEEP, hair: { shape: "short", color: 0x5a5a66 }, height: 1.0, width: 1.25, top: { kind: "jacket", color: 0x8d99ae, shirt: WHITE_SHIRT }, bottom: 0x6c7489, tie: 0x7a3b3b, glasses: true, prop: "crossword", headTilt: { x: 0.1 } },
+  creed: { skin: 0xe8c6a8, hair: { shape: "short", color: 0xc9c9c9 }, height: 0.98, width: 0.95, top: { kind: "shirt", color: 0xd8d0c0 }, bottom: 0x8b8378, tie: null, glasses: false, prop: null, headTilt: { x: 0.18, z: 0.12 }, slump: true },
+  erin: { skin: SKIN_LIGHT, hair: { shape: "shoulder", color: 0xc8572a }, height: 0.98, width: 0.92, top: { kind: "cardigan", color: 0xf7d774, shirt: WHITE_SHIRT }, bottom: 0x9fb4c7, tie: null, glasses: false, prop: null, smile: "big" },
+  ryan: { skin: SKIN_FAIR, hair: { shape: "slicked", color: 0x1f1a17 }, height: 1.02, width: 0.9, top: { kind: "shirt", color: 0xd8d8e0 }, bottom: 0x2e2d3a, tie: INK, tieStyle: "skinny", glasses: false, prop: null },
+  kelly: { skin: 0xc68e5c, hair: { shape: "long", color: 0x1f1a17 }, height: 0.95, width: 0.92, top: { kind: "shirt", color: 0xf5a3c7 }, bottom: 0x4f5566, tie: null, glasses: false, prop: null, smile: "big" },
+  toby: { skin: SKIN_LIGHT, hair: { shape: "thin", color: 0xb08968 }, height: 1.0, width: 1.0, top: { kind: "shirt", color: 0xe3d5bd }, bottom: 0x9c8c7a, tie: null, glasses: false, prop: null, slump: true, headTilt: { x: 0.12 } },
+  andy: { skin: SKIN_FAIR, hair: { shape: "short", color: 0xb98f6e }, height: 1.05, width: 1.0, top: { kind: "sweater", color: 0xa8c3a0, shirt: WHITE_SHIRT }, bottom: 0x5c6b8a, tie: 0xd62828, glasses: false, prop: null, smile: "big" },
+  meredith: { skin: SKIN_LIGHT, hair: { shape: "curly", color: 0xc0392b }, height: 0.98, width: 1.0, top: { kind: "shirt", color: 0xb48ee0 }, bottom: 0x5c4a6a, tie: null, glasses: false, prop: "mug" },
+  phyllis: { skin: SKIN_LIGHT, hair: { shape: "bob", color: 0xb8b8b8 }, height: 0.96, width: 1.2, top: { kind: "cardigan", color: 0xa8c3a0, shirt: 0xe8a0b4 }, bottom: 0x7e6b8f, tie: null, glasses: false, prop: null, smile: "warm" },
+  darryl: { skin: SKIN_BROWN, hair: { shape: "cap", color: 0x3b3a4f }, height: 1.08, width: 1.15, top: { kind: "warehouse", color: 0x5b8fd6 }, bottom: 0x4f5566, tie: null, glasses: false, prop: "badge" },
+  holly: { skin: SKIN_LIGHT, hair: { shape: "shoulder", color: 0xf0d78c }, height: 1.0, width: 0.95, top: { kind: "jacket", color: 0x6fa3d8, shirt: WHITE_SHIRT }, bottom: 0x5c6b8a, tie: null, glasses: false, prop: null, smile: "warm" },
+  jan: { skin: SKIN_LIGHT, hair: { shape: "bob", color: 0x2b1d14 }, height: 1.02, width: 0.92, top: { kind: "jacket", color: 0x2e2d3a, shirt: WHITE_SHIRT }, bottom: 0x2e2d3a, tie: null, glasses: false, prop: null },
+  david: { skin: SKIN_LIGHT, hair: { shape: "side_part", color: 0x9a9ba3 }, height: 1.04, width: 1.0, top: { kind: "jacket", color: 0x2f4a6e, shirt: WHITE_SHIRT }, bottom: 0x2f4a6e, tie: 0x7a3b3b, glasses: false, prop: null },
+  robert: { skin: SKIN_FAIR, hair: { shape: "slicked", color: 0xc0c0c0 }, height: 1.08, width: 1.0, top: { kind: "jacket", color: 0x2a2a35, shirt: WHITE_SHIRT }, bottom: 0x2a2a35, tie: INK, glasses: false, prop: null },
+  nellie: { skin: SKIN_LIGHT, hair: { shape: "shoulder", color: 0x5a3a28 }, height: 1.0, width: 1.0, top: { kind: "jacket", color: 0xb3aec9, shirt: 0xf28b82 }, bottom: 0x4f5566, tie: null, glasses: false, prop: null, smile: "warm" },
+  gabe: { skin: 0xf6e0cc, hair: { shape: "short", color: 0x2b1d14 }, height: 1.15, width: 0.9, top: { kind: "jacket", color: 0x8d99ae, shirt: WHITE_SHIRT }, bottom: 0x6c7489, tie: 0x5c6b8a, tieStyle: "skinny", glasses: false, prop: null },
+};
+
+/** The look for an agent name ("Michael (CEO)" -> michael), or null when the first name is unknown. */
+export function lookFor(name: string): Look | null {
+  const first = name.trim().split(/[\s(]/)[0]?.toLowerCase() ?? "";
+  return LOOKS[first] ?? null;
+}
+
+/** A tapered flat wedge: a 4-sided cylinder turned 45 degrees and squashed. Used for ties, lapels and collars. */
+function wedgeGeometry(topW: number, bottomW: number, h: number, depth: number): THREE.BufferGeometry {
+  const g = new THREE.CylinderGeometry(topW / Math.SQRT2, bottomW / Math.SQRT2, h, 4);
+  g.rotateY(Math.PI / 4);
+  g.scale(1, 1, depth);
+  return g;
+}
 
 const SKIN = 0xf1c27d;
 const WALK_SPEED = 3.4; // tiles per second at 1x
@@ -62,6 +140,8 @@ export class Character {
   private readonly armR = new THREE.Group();
   private readonly legL = new THREE.Group();
   private readonly legR = new THREE.Group();
+  private readonly look: Look | null;
+  private readonly headBase = { x: 0, z: 0 };
   private readonly materials: THREE.Material[] = [];
   private readonly geometries: THREE.BufferGeometry[] = [];
   private nameTag: THREE.Sprite;
@@ -84,6 +164,7 @@ export class Character {
   private bubbleUntil = 0;
   private celebrateUntil = 0;
   private typingBoostUntil = 0;
+  private waveUntil = 0;
   private glanceUntil = 0;
   private nodUntil = 0;
   private fade: { from: number; to: number; elapsed: number; dur: number; done: () => void } | null = null;
@@ -93,7 +174,9 @@ export class Character {
     this.agent = agent;
     this.office = office;
     this.tile = { ...startTile };
-    this.buildBody(opts.small === true);
+    this.look = agent.kind === "contractor" ? null : lookFor(agent.name);
+    if (this.look) this.buildLookBody(this.look);
+    else this.buildBody(opts.small === true);
     this.nameTag = this.makeNameTag();
     this.group.add(this.nameTag);
     this.bubble = this.makeBubbleSprite();
@@ -108,6 +191,11 @@ export class Character {
     this.folder.visible = false;
     this.group.position.copy(tileToWorld(this.tile));
     if (opts.small) this.group.scale.setScalar(0.62);
+    // Taller builds carry their tag, bubble and alert higher.
+    const h = this.look?.height ?? 1;
+    this.nameTag.position.y = 1.92 * h;
+    this.bubble.position.y = 2.65 + (h - 1) * 1.4;
+    this.alert.position.y = 1.75 * h;
     this.applyStatePose(0);
   }
 
@@ -154,11 +242,18 @@ export class Character {
     this.bubbleUntil = this.t + seconds;
   }
 
+  /** Waves at the camera for `seconds`, then returns to idle (or typing when a task is active). */
+  wave(seconds = 4, face?: Tile | null): void {
+    this.setState("wave", face);
+    this.waveUntil = this.t + seconds;
+  }
+
   /** Sets the animation state immediately (does not interrupt walking). */
   setState(state: AnimState, face?: Tile | null): void {
     this.state = state;
     if (face !== undefined) this.faceTile = face;
     if (state === "celebrate") this.celebrateUntil = this.t + 2;
+    if (state === "wave") this.waveUntil = this.t + 4;
     if (!this.current && this.faceTile) this.lookAt(this.faceTile);
     this.alert.visible = state === "blocked";
   }
@@ -261,6 +356,9 @@ export class Character {
     this.updateWalk(dt);
     if (this.bubble.visible && this.t > this.bubbleUntil) this.bubble.visible = false;
     if (this.state === "celebrate" && this.t > this.celebrateUntil) {
+      this.state = this.agent.currentTaskId ? "sit_typing" : "idle";
+    }
+    if (this.state === "wave" && this.t > this.waveUntil) {
       this.state = this.agent.currentTaskId ? "sit_typing" : "idle";
     }
     // Yaw smoothing (shortest arc).
@@ -388,9 +486,10 @@ export class Character {
     this.cup.visible = cupVisible;
 
     rig.position.y = 0;
-    head.rotation.set(0, 0, 0);
+    head.rotation.set(this.headBase.x, 0, this.headBase.z);
     let armLx = 0;
     let armRx = 0;
+    let armRz = 0;
     let legLx = 0;
     let legRx = 0;
 
@@ -447,6 +546,14 @@ export class Character {
           armLx = 0.1;
           head.rotation.x = Math.sin(t * 1.5) > 0.9 ? 0.25 : 0;
           break;
+        case "wave":
+          // Right arm up and swinging side to side, a small bounce, head cocked.
+          rig.position.y = Math.abs(Math.sin(t * 6)) * 0.06;
+          armRx = Math.PI - 0.35;
+          armRz = Math.sin(t * 9) * 0.45;
+          armLx = Math.sin(t * 2) * 0.08;
+          head.rotation.z = this.headBase.z + 0.18 + Math.sin(t * 3) * 0.05;
+          break;
       }
       if (seated && this.faceTile) this.lookAt(this.faceTile);
     }
@@ -457,6 +564,7 @@ export class Character {
     const k = Math.min(1, dt * 14);
     this.armL.rotation.x += (armLx - this.armL.rotation.x) * k;
     this.armR.rotation.x += (armRx - this.armR.rotation.x) * k;
+    this.armR.rotation.z += (armRz - this.armR.rotation.z) * k;
     this.legL.rotation.x += (legLx - this.legL.rotation.x) * k;
     this.legR.rotation.x += (legRx - this.legR.rotation.x) * k;
     // Alert sits beside the head and bobs.
@@ -548,6 +656,424 @@ export class Character {
       this.headGroup.add(hat);
     }
     void small;
+  }
+
+  /** Builds the figure from a cast Look: build, clothes, hair, face and one prop. */
+  private buildLookBody(look: Look): void {
+    const kind = look.top.kind;
+    const skinMat = this.mat(look.skin);
+    const darkMat = this.mat(INK);
+    const topMat = this.mat(look.top.color);
+    const layered = kind === "jacket" || kind === "cardigan" || kind === "vest";
+    const shirtColor = look.top.shirt ?? (layered || kind === "sweater" ? WHITE_SHIRT : look.top.color);
+    const shirtMat = this.mat(shirtColor);
+    const bottomMat = this.mat(look.bottom);
+    // Vests leave the shirt sleeves showing; everything else colours the sleeves with the top.
+    const sleeveMat = kind === "vest" ? shirtMat : topMat;
+    // The torso cylinder shows the layer under any jacket/cardigan/vest.
+    const torsoMat = layered ? shirtMat : topMat;
+
+    this.rig.scale.set(look.width, look.height, look.width);
+    const slump = look.slump === true;
+    const shoulderY = slump ? 0.96 : 1.02;
+
+    // Legs: pivot at the hip, mesh hangs below.
+    for (const [grp, x] of [
+      [this.legL, -0.11],
+      [this.legR, 0.11],
+    ] as const) {
+      grp.position.set(x, 0.4, 0);
+      const leg = this.mesh(new THREE.BoxGeometry(0.16, 0.4, 0.16), bottomMat);
+      leg.position.y = -0.2;
+      grp.add(leg);
+      this.rig.add(grp);
+    }
+    // Torso.
+    const body = this.mesh(new THREE.CylinderGeometry(0.26, 0.3, 0.62, 10), torsoMat);
+    body.position.y = 0.71;
+    this.rig.add(body);
+    const shoulders = this.mesh(new THREE.SphereGeometry(0.26, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), sleeveMat);
+    shoulders.position.y = shoulderY;
+    if (slump) shoulders.scale.set(1.05, 0.7, 1.05);
+    this.rig.add(shoulders);
+    if (kind === "dress") {
+      const skirt = this.mesh(new THREE.CylinderGeometry(0.3, 0.42, 0.3, 10), topMat);
+      skirt.position.y = 0.42;
+      this.rig.add(skirt);
+    }
+    // Arms: pivot at the shoulder.
+    for (const [grp, x] of [
+      [this.armL, -0.36],
+      [this.armR, 0.36],
+    ] as const) {
+      grp.position.set(x, shoulderY - 0.04, 0);
+      const arm = this.mesh(new THREE.BoxGeometry(0.12, 0.42, 0.12), sleeveMat);
+      arm.position.y = -0.21;
+      grp.add(arm);
+      const hand = this.mesh(new THREE.SphereGeometry(0.07, 8, 6), skinMat);
+      hand.position.y = -0.44;
+      grp.add(hand);
+      this.rig.add(grp);
+    }
+    // Head and face: pivot at the neck.
+    this.headGroup.position.set(0, shoulderY, 0);
+    const head = this.mesh(new THREE.SphereGeometry(0.24, 12, 10), skinMat);
+    head.position.y = 0.26;
+    this.headGroup.add(head);
+    for (const x of [-0.09, 0.09]) {
+      const eye = this.mesh(new THREE.SphereGeometry(0.035, 6, 6), darkMat);
+      eye.position.set(x, 0.3, 0.21);
+      this.headGroup.add(eye);
+    }
+    if (look.smile) {
+      const r = look.smile === "big" ? 0.09 : 0.065;
+      const mouth = this.mesh(new THREE.TorusGeometry(r, 0.013, 6, 10, Math.PI), darkMat);
+      mouth.rotation.z = Math.PI;
+      mouth.position.set(0, 0.2, 0.225);
+      this.headGroup.add(mouth);
+    }
+    this.headBase.x = look.headTilt?.x ?? 0;
+    this.headBase.z = look.headTilt?.z ?? 0;
+    this.rig.add(this.headGroup);
+    this.group.add(this.rig);
+
+    this.addClothes(look, topMat, shirtMat, darkMat);
+    if (look.tie !== null) this.addTie(look.tie, look.tieStyle, kind === "sweater" || kind === "vest");
+    if (look.glasses) this.addGlasses(darkMat);
+    this.addHair(look.hair.shape, look.hair.color);
+    this.addProp(look.prop, darkMat);
+  }
+
+  private addClothes(look: Look, topMat: THREE.Material, shirtMat: THREE.Material, darkMat: THREE.Material): void {
+    const rig = this.rig;
+    const lighter = (c: number) => this.mat(pastel(c, 0.25));
+    switch (look.top.kind) {
+      case "jacket": {
+        // A slightly wider box than the torso, open at the front so the shirt and tie show.
+        const back = this.mesh(new THREE.BoxGeometry(0.66, 0.58, 0.46), topMat);
+        back.position.set(0, 0.7, -0.08);
+        rig.add(back);
+        for (const x of [-0.21, 0.21]) {
+          const panel = this.mesh(new THREE.BoxGeometry(0.24, 0.58, 0.18), topMat);
+          panel.position.set(x, 0.7, 0.22);
+          rig.add(panel);
+        }
+        // Lapels: two thin wedges folded outward from the opening.
+        const lapelMat = lighter(look.top.color);
+        for (const side of [-1, 1]) {
+          const lapel = this.mesh(wedgeGeometry(0.04, 0.12, 0.3, 0.3), lapelMat);
+          lapel.position.set(side * 0.1, 0.86, 0.32);
+          lapel.rotation.z = side * 0.35;
+          rig.add(lapel);
+        }
+        break;
+      }
+      case "cardigan": {
+        const back = this.mesh(new THREE.BoxGeometry(0.62, 0.62, 0.44), topMat);
+        back.position.set(0, 0.68, -0.08);
+        rig.add(back);
+        for (const x of [-0.19, 0.19]) {
+          const panel = this.mesh(new THREE.BoxGeometry(0.22, 0.62, 0.16), topMat);
+          panel.position.set(x, 0.68, 0.22);
+          rig.add(panel);
+        }
+        // Three little buttons down one edge.
+        for (let i = 0; i < 3; i++) {
+          const button = this.mesh(new THREE.SphereGeometry(0.022, 6, 6), darkMat);
+          button.position.set(0.09, 0.9 - i * 0.14, 0.31);
+          rig.add(button);
+        }
+        break;
+      }
+      case "vest": {
+        const vest = this.mesh(new THREE.BoxGeometry(0.56, 0.5, 0.56), topMat);
+        vest.position.set(0, 0.66, 0);
+        rig.add(vest);
+        // A V of shirt collar over the vest's neckline.
+        for (const side of [-1, 1]) {
+          const collar = this.mesh(wedgeGeometry(0.03, 0.1, 0.2, 0.3), shirtMat);
+          collar.position.set(side * 0.07, 0.9, 0.29);
+          collar.rotation.z = side * 0.6;
+          rig.add(collar);
+        }
+        break;
+      }
+      case "sweater": {
+        for (const side of [-1, 1]) {
+          const collar = this.mesh(wedgeGeometry(0.03, 0.1, 0.18, 0.3), shirtMat);
+          collar.position.set(side * 0.07, 0.92, 0.29);
+          collar.rotation.z = side * 0.6;
+          rig.add(collar);
+        }
+        break;
+      }
+      case "polo": {
+        const collarMat = lighter(look.top.color);
+        for (const side of [-1, 1]) {
+          const flap = this.mesh(new THREE.BoxGeometry(0.1, 0.1, 0.03), collarMat);
+          flap.position.set(side * 0.08, 0.95, 0.27);
+          flap.rotation.z = side * -0.5;
+          rig.add(flap);
+        }
+        break;
+      }
+      case "warehouse": {
+        // Chest pocket and a button placket.
+        const pocket = this.mesh(new THREE.BoxGeometry(0.14, 0.12, 0.02), lighter(look.top.color));
+        pocket.position.set(-0.12, 0.8, 0.29);
+        rig.add(pocket);
+        for (let i = 0; i < 3; i++) {
+          const button = this.mesh(new THREE.SphereGeometry(0.02, 6, 6), darkMat);
+          button.position.set(0, 0.9 - i * 0.14, 0.3);
+          rig.add(button);
+        }
+        break;
+      }
+      case "dress":
+      case "shirt":
+        break;
+    }
+  }
+
+  /** A thin tapered tie: knot plus blade. `short` stops at a sweater or vest neckline. */
+  private addTie(color: number, style: Look["tieStyle"], short: boolean): void {
+    const mat = this.mat(color);
+    const w = style === "skinny" ? 0.6 : 1;
+    const knot = this.mesh(new THREE.BoxGeometry(0.08 * w, 0.06, 0.04), mat);
+    knot.position.set(0, 0.99, 0.29);
+    const bladeH = short ? 0.1 : 0.34;
+    const blade = this.mesh(wedgeGeometry(0.05 * w, 0.1 * w, bladeH, 0.4), mat);
+    blade.position.set(0, 0.96 - bladeH / 2, 0.3);
+    if (style === "loose") {
+      knot.position.set(0.03, 0.95, 0.29);
+      blade.position.set(0.05, 0.93 - bladeH / 2, 0.3);
+      blade.rotation.z = -0.12;
+    }
+    this.rig.add(knot, blade);
+  }
+
+  private addGlasses(darkMat: THREE.Material): void {
+    for (const x of [-0.09, 0.09]) {
+      const rim = this.mesh(new THREE.TorusGeometry(0.065, 0.012, 6, 12), darkMat);
+      rim.position.set(x, 0.3, 0.225);
+      this.headGroup.add(rim);
+    }
+    const bridge = this.mesh(new THREE.BoxGeometry(0.06, 0.015, 0.015), darkMat);
+    bridge.position.set(0, 0.31, 0.23);
+    this.headGroup.add(bridge);
+    for (const x of [-0.16, 0.16]) {
+      const arm = this.mesh(new THREE.BoxGeometry(0.015, 0.015, 0.2), darkMat);
+      arm.position.set(x, 0.3, 0.12);
+      this.headGroup.add(arm);
+    }
+  }
+
+  private addHair(shape: HairShape, color: number): void {
+    const head = this.headGroup;
+    const mat = this.mat(color);
+    const cap = (radius = 0.255, extent = Math.PI / 2.4, y = 0.27) => {
+      const m = this.mesh(new THREE.SphereGeometry(radius, 12, 8, 0, Math.PI * 2, 0, extent), mat);
+      m.position.set(0, y, -0.01);
+      head.add(m);
+      return m;
+    };
+    switch (shape) {
+      case "short":
+        cap();
+        break;
+      case "side_part": {
+        cap();
+        const swoop = this.mesh(new THREE.BoxGeometry(0.22, 0.07, 0.14), mat);
+        swoop.position.set(-0.07, 0.44, 0.15);
+        swoop.rotation.z = -0.25;
+        head.add(swoop);
+        break;
+      }
+      case "centre_part": {
+        cap();
+        for (const side of [-1, 1]) {
+          const swoop = this.mesh(new THREE.BoxGeometry(0.12, 0.07, 0.14), mat);
+          swoop.position.set(side * 0.11, 0.44, 0.15);
+          swoop.rotation.z = side * 0.3;
+          head.add(swoop);
+        }
+        break;
+      }
+      case "ponytail": {
+        cap(0.26, Math.PI / 2.1);
+        const tail = this.mesh(new THREE.CylinderGeometry(0.05, 0.03, 0.3, 8), mat);
+        tail.position.set(0, 0.16, -0.28);
+        tail.rotation.x = 0.45;
+        head.add(tail);
+        const band = this.mesh(new THREE.SphereGeometry(0.06, 8, 6), mat);
+        band.position.set(0, 0.3, -0.24);
+        head.add(band);
+        break;
+      }
+      case "bob": {
+        // A wider cap that comes down over the ears.
+        cap(0.285, Math.PI / 1.7, 0.29);
+        for (const x of [-0.23, 0.23]) {
+          const side = this.mesh(new THREE.BoxGeometry(0.1, 0.24, 0.22), mat);
+          side.position.set(x, 0.2, -0.03);
+          head.add(side);
+        }
+        break;
+      }
+      case "long": {
+        cap(0.275, Math.PI / 1.8, 0.29);
+        for (const x of [-0.22, 0.22]) {
+          const side = this.mesh(new THREE.BoxGeometry(0.1, 0.3, 0.2), mat);
+          side.position.set(x, 0.16, -0.06);
+          head.add(side);
+        }
+        const back = this.mesh(new THREE.BoxGeometry(0.4, 0.44, 0.1), mat);
+        back.position.set(0, 0.06, -0.21);
+        head.add(back);
+        break;
+      }
+      case "shoulder": {
+        cap(0.27, Math.PI / 1.9, 0.29);
+        for (const x of [-0.22, 0.22]) {
+          const side = this.mesh(new THREE.BoxGeometry(0.1, 0.26, 0.18), mat);
+          side.position.set(x, 0.18, -0.06);
+          head.add(side);
+        }
+        const back = this.mesh(new THREE.BoxGeometry(0.4, 0.3, 0.1), mat);
+        back.position.set(0, 0.12, -0.2);
+        head.add(back);
+        break;
+      }
+      case "bun": {
+        cap(0.26, Math.PI / 2.2);
+        const bun = this.mesh(new THREE.SphereGeometry(0.09, 8, 6), mat);
+        bun.position.set(0, 0.42, -0.2);
+        head.add(bun);
+        break;
+      }
+      case "bald":
+        break;
+      case "fringe": {
+        // Hair only around the back and sides.
+        const ring = this.mesh(new THREE.TorusGeometry(0.22, 0.05, 6, 16, Math.PI), mat);
+        ring.rotation.x = -Math.PI / 2;
+        ring.position.set(0, 0.28, 0);
+        head.add(ring);
+        break;
+      }
+      case "curly": {
+        const spots: [number, number, number][] = [
+          [0, 0.5, 0],
+          [-0.15, 0.46, 0.08],
+          [0.15, 0.46, 0.08],
+          [-0.2, 0.38, -0.1],
+          [0.2, 0.38, -0.1],
+          [0, 0.42, -0.2],
+          [-0.12, 0.47, -0.12],
+          [0.12, 0.47, -0.12],
+        ];
+        for (const [x, y, z] of spots) {
+          const curl = this.mesh(new THREE.SphereGeometry(0.11, 8, 6), mat);
+          curl.position.set(x, y, z);
+          head.add(curl);
+        }
+        break;
+      }
+      case "slicked": {
+        const m = cap(0.26, Math.PI / 2.6, 0.26);
+        m.scale.set(1, 0.75, 1.05);
+        m.position.z = -0.03;
+        break;
+      }
+      case "messy": {
+        cap();
+        const bumps: [number, number, number][] = [
+          [-0.1, 0.5, 0.05],
+          [0.08, 0.52, -0.04],
+          [0.16, 0.45, 0.1],
+          [-0.17, 0.44, -0.08],
+        ];
+        for (const [x, y, z] of bumps) {
+          const tuft = this.mesh(new THREE.SphereGeometry(0.075, 7, 5), mat);
+          tuft.position.set(x, y, z);
+          head.add(tuft);
+        }
+        break;
+      }
+      case "thin": {
+        // A sparse, flat cap that leaves the crown mostly bare.
+        const m = cap(0.25, Math.PI / 3.2, 0.26);
+        m.scale.set(1.02, 0.55, 1.02);
+        m.position.z = -0.05;
+        break;
+      }
+      case "cap": {
+        const crown = this.mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.12, 10), mat);
+        crown.position.set(0, 0.44, 0);
+        const brim = this.mesh(new THREE.BoxGeometry(0.3, 0.03, 0.22), mat);
+        brim.position.set(0, 0.39, 0.27);
+        head.add(crown, brim);
+        break;
+      }
+    }
+  }
+
+  private addProp(prop: PropKind, darkMat: THREE.Material): void {
+    switch (prop) {
+      case "calculator_watch": {
+        const strap = this.mesh(new THREE.BoxGeometry(0.14, 0.05, 0.14), darkMat);
+        strap.position.set(0, -0.37, 0);
+        const face = this.mesh(new THREE.BoxGeometry(0.06, 0.06, 0.02), this.mat(0xb5e48c));
+        face.position.set(0, -0.37, 0.075);
+        this.armL.add(strap, face);
+        break;
+      }
+      case "cat_pin": {
+        const pin = this.mesh(new THREE.SphereGeometry(0.03, 8, 6), this.mat(0xf7d774));
+        pin.position.set(0.12, 0.9, 0.3);
+        this.rig.add(pin);
+        break;
+      }
+      case "crossword": {
+        const paper = this.mesh(new THREE.BoxGeometry(0.2, 0.26, 0.012), this.mat(0xffffff));
+        paper.position.set(0, -0.42, 0.1);
+        paper.rotation.x = -0.4;
+        const grid = this.mesh(new THREE.BoxGeometry(0.12, 0.12, 0.006), this.mat(0xd9d9e3));
+        grid.position.set(0, -0.4, 0.11);
+        grid.rotation.x = -0.4;
+        this.armL.add(paper, grid);
+        break;
+      }
+      case "mug": {
+        const mug = this.mesh(new THREE.CylinderGeometry(0.07, 0.06, 0.14, 8), this.mat(0xffffff));
+        mug.position.set(0, -0.46, 0.08);
+        this.armL.add(mug);
+        break;
+      }
+      case "clipboard": {
+        const board = this.mesh(new THREE.BoxGeometry(0.3, 0.38, 0.03), this.mat(0x8d5524));
+        board.position.set(0.02, -0.4, 0.12);
+        this.armL.add(board);
+        break;
+      }
+      case "badge": {
+        const strap = this.mesh(new THREE.BoxGeometry(0.1, 0.22, 0.02), darkMat);
+        strap.position.set(-0.08, 0.88, 0.3);
+        const card = this.mesh(new THREE.BoxGeometry(0.14, 0.1, 0.02), this.mat(0xffffff));
+        card.position.set(-0.08, 0.72, 0.31);
+        this.rig.add(strap, card);
+        break;
+      }
+      case "pen": {
+        const pen = this.mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.14, 6), darkMat);
+        pen.position.set(0.16, 0.86, 0.3);
+        pen.rotation.z = 0.1;
+        this.rig.add(pen);
+        break;
+      }
+      case null:
+        break;
+    }
   }
 
   private addAccessory(role: RoleId, bodyMat: THREE.Material, darkMat: THREE.Material): void {
