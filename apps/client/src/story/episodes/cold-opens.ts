@@ -91,7 +91,13 @@ export const coldAllHands: Episode = {
       },
       { at: 5, run: () => ctx.say(cast.michael, "...Guys?", 3) },
       { at: 5.3, run: () => ctx.gesture(cast.michael, "lookAround") },
-      { at: 6, run: () => ctx.snapZoom(emptyChairs(), 1.5, 1.4) },
+      {
+        at: 6,
+        run: () => {
+          ctx.snapZoom(emptyChairs(), 1.5, 1.4);
+          ctx.cue("crickets");
+        },
+      },
       { at: 8.6, run: () => ctx.whipPan(cast.jim, 9) },
       { at: 9.2, run: () => ctx.gesture(cast.jim, "lookAtCamera") },
     ];

@@ -1,6 +1,6 @@
 import type * as THREE from "three";
 import type { Agent, AnimState, Approval, Event, RoleId, Task } from "@tokenvalley/shared";
-import type { AudioEngine } from "../audio/engine";
+import type { AudioEngine, SfxName, SfxParams } from "../audio/engine";
 import type { CameraMode, Store } from "../state/store";
 import type { Overlay } from "../ui/overlay";
 import type { CameraRig } from "../world/camera";
@@ -23,6 +23,12 @@ export interface StoryHost {
   setCamera: (mode: CameraMode) => void;
   /** Post-processing look and lens for a camera mode, without moving the camera (snap zooms, talking heads). */
   setLook: (mode: CameraMode) => void;
+  /**
+   * Audio capture run: the beats are stepped synchronously against a cue
+   * recorder. Characters, camera and director calls become no-ops, nothing
+   * touches the live page, and no listeners or network probes are installed.
+   */
+  captureAudio?: boolean;
 }
 
 export interface Beat {
@@ -49,6 +55,8 @@ export interface EpisodeContext {
   rig: CameraRig;
   valley: Valley;
   audio: AudioEngine;
+  /** A story sound cue (crickets, a record scratch). Plays live, records when exporting. */
+  cue: (name: SfxName, params?: SfxParams) => void;
   mocku: Mocku;
   companyId: string;
   cast: Record<CastName, Agent>;

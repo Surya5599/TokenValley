@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { DEFAULT_MODEL, HOME_SPOTS, ROLE_HOME, type Agent, type Approval, type Company, type Event, type RoleId, type ServerMessage, type Task } from "@tokenvalley/shared";
-import type { CameraMode } from "../state/store";
+import { createCueRecorder, type CueRecord, type SfxName, type SfxParams } from "../audio/engine";
+import { Store, type CameraMode } from "../state/store";
 import { spotTile, tileToWorld, type Tile } from "../world/office";
 import { nearestWalkable } from "../world/pathfinding";
 import { StoryCards } from "./cards";
@@ -9,7 +10,7 @@ import { EPISODES, episodeById } from "./episodes";
 import { Mocku } from "./mocku";
 
 export type { Episode, StoryHost } from "./episode";
-export { EPISODES } from "./episodes";
+export { EPISODES, episodeById } from "./episodes";
 
 /**
  * Story mode (?demo=story&ep=<id>): deterministic, timed episodes for screen
@@ -112,6 +113,7 @@ export function episodeFromUrl(): Episode {
 
 export function startStory(host: StoryHost, episode: Episode = episodeFromUrl()): Story {
   const { store, director, rig, handleMessage, audio } = host;
+  const capture = host.captureAudio === true;
   const cast = makeCast();
   const mocku = new Mocku(rig, director, host.setLook);
   const cards = new StoryCards(host.overlayRoot);
@@ -139,7 +141,8 @@ export function startStory(host: StoryHost, episode: Episode = episodeFromUrl())
   const approval = (id: string, summary: string): Approval => ({ id, companyId: COMPANY, kind: "ship", summary, status: "pending", founderComment: null });
 
   // ---- characters and camera ----
-  const character = (a: Agent) => director.characters.get(a.id) ?? null;
+  // No characters exist in a capture run; every helper tolerates a missing one.
+  const character = (a: Agent) => (capture ? null : (director.characters.get(a.id) ?? null));
   const targetOf = (t: Agent | THREE.Vector3): THREE.Vector3 | (() => THREE.Vector3 | null) => (t instanceof THREE.Vector3 ? t : () => director.characterPosition(t.id));
   const follow = (a: Agent, seconds: number) => rig.cinematicTo(() => director.characterPosition(a.id), FOLLOW.radius, FOLLOW.elevation, FOLLOW.azimuth, seconds);
   const overview = (seconds: number) => rig.cinematicTo(OFFICE_TARGET, OFFICE.radius, OFFICE.elevation, OFFICE.azimuth, seconds);
@@ -157,6 +160,7 @@ export function startStory(host: StoryHost, episode: Episode = episodeFromUrl())
   const deliverableUrl = new URLSearchParams(window.location.search).get("deliverable") || DEFAULT_DELIVERABLE;
   let deliverableReachable: boolean | null = null;
   const probeDeliverable = () => {
+    if (capture) return;
     // A refused connection rejects; an opaque cross-origin response resolves. Either way we know whether to show the iframe.
     fetch(deliverableUrl, { mode: "no-cors", cache: "no-store" })
       .then(() => {
@@ -235,6 +239,7 @@ export function startStory(host: StoryHost, episode: Episode = episodeFromUrl())
   const toward = (t: Tile): Tile => ({ x: t.x + 3, z: t.z + 4 }); // roughly toward the office camera
 
   const gatherInLobby = () => {
+    if (capture) return;
     const tiles = lobbyTiles();
     let i = 0;
     for (const a of Object.values(cast)) {
@@ -277,12 +282,16 @@ export function startStory(host: StoryHost, episode: Episode = episodeFromUrl())
     probeDeliverable();
   };
 
+  /** Story cues go through the engine, which is the recorder in a capture run. */
+  const cue = (name: SfxName, params?: SfxParams) => audio.play(name, params);
+
   const ctx: EpisodeContext = {
     store,
     director,
     rig,
     valley: host.valley,
     audio,
+    cue,
     mocku,
     companyId: COMPANY,
     cast,
@@ -300,7 +309,11 @@ export function startStory(host: StoryHost, episode: Episode = episodeFromUrl())
     overview,
     meeting,
     look: (m: CameraMode) => mocku.look(m),
-    gesture: (a, name) => character(a)?.gesture(name),
+    gesture: (a, name) => {
+      // The look down the lens gets its record scratch.
+      if (name === "lookAtCamera") cue("jimlook");
+      character(a)?.gesture(name);
+    },
     expression: (a, e, seconds) => character(a)?.setExpression(e, seconds),
     state: (a, s, face) => character(a)?.setState(s, face),
     say: (a, text, seconds) => {
@@ -319,9 +332,11 @@ export function startStory(host: StoryHost, episode: Episode = episodeFromUrl())
     whipPan: (t, radius, elevation) => mocku.whipPan(targetOf(t), radius, elevation),
     pushIn: (t, seconds) => mocku.pushIn(targetOf(t), seconds),
     talkingHead: (a, line, seconds, expression) => {
+      cards.introduce(a);
+      // The rimshot lands as the caption appears (the interview's line delay).
+      mocku.later(0.6, () => cue("talkinghead"));
       const ch = character(a);
       if (!ch) return;
-      cards.introduce(a);
       mocku.talkingHead(ch, line, seconds, expression, (l) => cards.showCaption(l, Math.max(1, seconds - 0.8)));
     },
     setCamera: host.setCamera,
@@ -377,18 +392,20 @@ export function startStory(host: StoryHost, episode: Episode = episodeFromUrl())
     update(Math.max(0, b.at - time));
   };
 
-  window.addEventListener("keydown", (e) => {
-    const target = e.target as HTMLElement | null;
-    if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT")) return;
-    if (e.key === "p" || e.key === "P") {
-      progressVisible = !progressVisible;
-      progress.classList.toggle("hidden", !progressVisible);
-    } else if (e.key === "n" || e.key === "N") {
-      skip();
-    } else if (e.key === "l" || e.key === "L") {
-      cards.setNameCards(!cards.nameCardsOn);
-    }
-  });
+  if (!capture) {
+    window.addEventListener("keydown", (e) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT")) return;
+      if (e.key === "p" || e.key === "P") {
+        progressVisible = !progressVisible;
+        progress.classList.toggle("hidden", !progressVisible);
+      } else if (e.key === "n" || e.key === "N") {
+        skip();
+      } else if (e.key === "l" || e.key === "L") {
+        cards.setNameCards(!cards.nameCardsOn);
+      }
+    });
+  }
 
   // The first beats run now so the snapshot exists before the first frame.
   update(0);
@@ -402,4 +419,77 @@ export function startStory(host: StoryHost, episode: Episode = episodeFromUrl())
     duration,
     episode,
   };
+}
+
+// ---- audio capture ----
+
+/** Step of the capture clock. */
+const CAPTURE_STEP = 1 / 60;
+
+/**
+ * A callable stand-in for the director, rig, valley and overlay in a capture
+ * run. Any property is another stand-in, any call returns one, and any
+ * assignment is accepted, so beats that poke the camera or the office are
+ * harmless. Primitive conversions yield 0 / "" so arithmetic never throws.
+ */
+function silentStub(): never {
+  const fn = function () {
+    /* no-op */
+  };
+  const stub: unknown = new Proxy(fn, {
+    get(_t, prop) {
+      if (typeof prop === "symbol" || prop === "then") return undefined;
+      if (prop === "valueOf") return () => 0;
+      if (prop === "toString" || prop === "toJSON") return () => "";
+      return stub;
+    },
+    set: () => true,
+    apply: () => stub,
+    construct: () => stub as object,
+    has: () => true,
+  });
+  return stub as never;
+}
+
+/**
+ * Runs an episode against a cue recorder and returns everything the engine
+ * would have played, on the story clock. Pure with respect to the live page:
+ * a fresh store, a detached overlay root, stubbed director and camera.
+ */
+export function captureEpisodeCues(episode: Episode): CueRecord[] {
+  const store = new Store();
+  store.demo = true;
+  const recorder = createCueRecorder({
+    roleOf: (id) => store.agents.get(id)?.role,
+    openTasksOf: (companyId) => store.tasksOf(companyId).filter((t) => t.status === "in_progress").length,
+  });
+  const handleMessage: StoryHost["handleMessage"] = (m) => {
+    if (m.kind === "snapshot") store.applySnapshot(m);
+    else if (m.kind === "event") {
+      store.applyEvent(m.event);
+      recorder.handleEvent(m.event, m.event.companyId === store.focusedCompanyId);
+    }
+  };
+  const host: StoryHost = {
+    store,
+    director: silentStub(),
+    rig: silentStub(),
+    overlay: silentStub(),
+    valley: silentStub(),
+    overlayRoot: document.createElement("div"),
+    audio: recorder,
+    handleMessage,
+    setCamera: () => undefined,
+    setLook: () => undefined,
+    captureAudio: true,
+  };
+  const story = startStory(host, episode);
+  // startStory ran the beats at 0; step the rest of the clock.
+  let t = 0;
+  while (t < story.duration) {
+    t = Math.min(story.duration, t + CAPTURE_STEP);
+    recorder.setTime(t);
+    story.update(CAPTURE_STEP);
+  }
+  return recorder.cues.slice().sort((a, b) => a.time - b.time);
 }

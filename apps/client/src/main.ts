@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import type { FoundCompanyInput, ServerMessage } from "@tokenvalley/shared";
 import { createAudio } from "./audio/engine";
+import { encodeWav, measure, normalizePeak, renderCues, toBase64 } from "./audio/render";
 import { startDemo } from "./demo";
-import { startStory, type Story } from "./story";
+import { captureEpisodeCues, episodeById, episodeFromUrl, startStory, type Story } from "./story";
 import { WsClient } from "./net/ws";
 import { Store, type CameraMode } from "./state/store";
 import { Overlay } from "./ui/overlay";
@@ -37,6 +38,7 @@ function bootstrap(): void {
   const audio = createAudio({
     defaultEffects: !storyMode,
     roleOf: (id) => store.agents.get(id)?.role,
+    openTasksOf: (companyId) => store.tasksOf(companyId).filter((t) => t.status === "in_progress").length,
     debug: import.meta.env.DEV && new URLSearchParams(window.location.search).has("audiodebug"),
     onChange: () => store.notify(),
   });
@@ -506,8 +508,33 @@ function bootstrap(): void {
   applyVisibility();
   requestAnimationFrame(tick);
 
+  // ---- offline audio export ----
+  /** The episode to export: the one playing, else ?ep=, else the pilot. */
+  const episodeFor = (id?: string) => {
+    if (id) {
+      const ep = episodeById(id);
+      if (!ep) throw new Error(`unknown episode "${id}"`);
+      return ep;
+    }
+    return story?.episode ?? episodeFromUrl();
+  };
+  /** Every cue the engine would play for an episode, on the story clock (also what the export renders). */
+  const captureCues = (id?: string) => captureEpisodeCues(episodeFor(id));
+  /** Renders the episode's whole soundtrack offline and returns it as a base64 WAV (48 kHz, stereo, 16-bit). */
+  const exportAudio = async (id?: string): Promise<string> => {
+    const ep = episodeFor(id);
+    const t0 = performance.now();
+    const cues = captureCues(ep.id);
+    const buffer = await renderCues(cues, ep.durationSeconds);
+    const gain = normalizePeak(buffer);
+    const wav = encodeWav(buffer);
+    const m = measure(buffer);
+    console.info(`[audio] export ${ep.id}: ${cues.length} cues, ${m.seconds.toFixed(2)} s, peak ${m.peakDb.toFixed(1)} dBFS, rms ${m.rmsDb.toFixed(1)} dBFS (lift ${(20 * Math.log10(gain)).toFixed(1)} dB), ${(performance.now() - t0).toFixed(0)} ms`);
+    return toBase64(wav);
+  };
+
   // Debug hook for driving the client from the console or scripts.
-  (window as unknown as { tokenvalley: unknown }).tokenvalley = { store, rig, director, valley, overlay, renderer, fx, setCamera, focusCompany, handleMessage, story, audio };
+  (window as unknown as { tokenvalley: unknown }).tokenvalley = { store, rig, director, valley, overlay, renderer, fx, setCamera, focusCompany, handleMessage, story, audio, exportAudio, captureCues, renderCues, measure };
 }
 
 bootstrap();

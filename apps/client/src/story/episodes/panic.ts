@@ -84,7 +84,13 @@ export const panic: Episode = {
       },
       { at: 40, run: () => ctx.say(cast.michael, "...Guys?", 3) },
       { at: 40.5, run: () => ctx.gesture(cast.michael, "lookAround") },
-      { at: 41.5, run: () => ctx.snapZoom(emptyChairs(), 1.5, 1.6) },
+      {
+        at: 41.5,
+        run: () => {
+          ctx.snapZoom(emptyChairs(), 1.5, 1.6);
+          ctx.cue("crickets");
+        },
+      },
       { at: 44.5, run: () => ctx.whipPan(cast.jim, 10) },
       { at: 45, run: () => ctx.gesture(cast.jim, "lookAtCamera") },
       // The founder hits panic: freeze, dim, silence.
