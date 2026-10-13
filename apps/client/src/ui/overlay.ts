@@ -1,5 +1,6 @@
 import { FoundCompanyInput, ROLE_LABEL, type Company, type CompanyPhase, type Event, type ModelTier, type RoleId, type TaskStatus } from "@tokenvalley/shared";
 import { CHANNEL_FOUNDER, CHANNEL_GENERAL, FOUNDER_ID, type CameraMode, type ChatLine, type CompanyStatus, type PanelTab, type Store } from "../state/store";
+import { EPISODES } from "../story/episodes";
 import { ROLE_COLOR } from "../world/character";
 
 export interface OverlayActions {
@@ -61,6 +62,9 @@ const SHORTCUTS: { keys: string[]; what: string }[] = [
   { keys: ["Esc"], what: "Back to the office or valley; close menus and dialogs" },
   { keys: ["M"], what: "Sound effects on or off" },
   { keys: ["Shift", "M"], what: "Music on or off" },
+  { keys: ["P"], what: "Story mode: progress line on or off" },
+  { keys: ["N"], what: "Story mode: skip to the next beat (rehearsal)" },
+  { keys: ["L"], what: "Story mode: name cards (lower thirds) on or off" },
   { keys: ["W", "A", "S", "D"], what: "Walk in first person; mouse to look; click to capture the mouse" },
   { keys: ["Drag"], what: "Orbit the camera" },
   { keys: ["Wheel"], what: "Zoom" },
@@ -794,11 +798,12 @@ export class Overlay {
       },
       {
         label: "Play story (for recording)",
-        title: "Reload with ?demo=story: a 130 second scripted storyline with camera moves (press P to hide the progress line)",
+        title: "Reload with ?demo=story: the 130 second pilot with camera moves (press P to hide the progress line)",
         onSelect: () => {
           window.location.search = "?demo=story";
         },
       },
+      { label: "Episodes…", title: "Scripted mockumentary episodes for recording", onSelect: () => this.openEpisodes() },
       { divider: true },
       { label: "About TokenValley", onSelect: () => this.openAbout() },
     ];
@@ -892,6 +897,36 @@ export class Overlay {
       table.append(keys, el("span", "what", s.what));
     }
     this.infoBody.append(table);
+    this.infoBackdrop.classList.add("open");
+    this.infoBackdrop.querySelector<HTMLButtonElement>("button")?.focus();
+  }
+
+  /** The episode list: title, tagline, duration and a Play button that reloads into that episode. */
+  private openEpisodes(): void {
+    const current = new URLSearchParams(window.location.search);
+    const playing = current.get("demo") === "story" ? (current.get("ep") ?? "pilot") : null;
+    this.infoBody.replaceChildren(el("h2", "", "Episodes"));
+    this.infoBody.append(el("p", "about muted", "Deterministic storylines through the real event pipeline, for screen recording. P hides the progress line, N skips to the next beat, L toggles name cards."));
+    const list = el("div", "episodes");
+    for (const ep of EPISODES) {
+      const row = el("div", `episode${ep.id === playing ? " playing" : ""}`);
+      const text = el("div", "ep-text");
+      const head = el("div", "ep-head");
+      head.append(el("span", "ep-title", ep.title), el("span", "ep-id", ep.id));
+      text.append(head, el("div", "ep-tag", ep.tagline));
+      row.append(text);
+      const m = Math.floor(ep.durationSeconds / 60);
+      const s = ep.durationSeconds % 60;
+      row.append(el("span", "ep-dur", m > 0 ? `${m}:${String(s).padStart(2, "0")}` : `${s}s`));
+      const play = el("button", ep.id === playing ? "" : "primary", ep.id === playing ? "Replay" : "Play");
+      play.type = "button";
+      play.addEventListener("click", () => {
+        window.location.search = `?demo=story&ep=${encodeURIComponent(ep.id)}`;
+      });
+      row.append(play);
+      list.append(row);
+    }
+    this.infoBody.append(list);
     this.infoBackdrop.classList.add("open");
     this.infoBackdrop.querySelector<HTMLButtonElement>("button")?.focus();
   }

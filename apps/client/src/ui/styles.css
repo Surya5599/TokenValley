@@ -1690,6 +1690,198 @@ button.linkish:disabled {
   opacity: 1;
 }
 
+/* Cold-open title card and end card. */
+.story-title,
+.story-end {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #0b0e14;
+  color: #f2f0f5;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+
+.story-title.in {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.story-end {
+  background: rgba(11, 14, 20, 0.92);
+  transition: opacity 1.2s ease;
+}
+
+.story-end.in {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.story-title .small,
+.story-end .small {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.story-title .big,
+.story-end .big {
+  font-size: 64px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+  text-align: center;
+  padding: 0 24px;
+}
+
+.story-title .tag,
+.story-end .tag {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.75);
+  font-style: italic;
+  text-align: center;
+  padding: 0 24px;
+}
+
+.story-title .mark {
+  position: absolute;
+  right: 28px;
+  bottom: 22px;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.22);
+}
+
+/* Lower-third name card: bottom-left, above the activity feed. */
+.story-lower {
+  position: absolute;
+  left: 10px;
+  bottom: 244px;
+  z-index: 26;
+  min-width: 220px;
+  padding: 8px 14px 9px 12px;
+  border-left: 4px solid var(--accent);
+  background: rgba(11, 14, 20, 0.82);
+  backdrop-filter: blur(6px);
+  border-radius: 0 6px 6px 0;
+  color: #fff;
+  transform: translateX(-16px);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.25s ease,
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.story-lower.in {
+  opacity: 1;
+  transform: none;
+}
+
+.story-lower .name {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1.1;
+}
+
+.story-lower .role {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-top: 3px;
+}
+
+/* Interview caption for talking heads: bottom centre, above the progress line. */
+.story-caption {
+  position: absolute;
+  left: 50%;
+  bottom: 36px;
+  transform: translateX(-50%) translateY(6px);
+  z-index: 26;
+  max-width: 60%;
+  padding: 8px 16px;
+  border-radius: 6px;
+  background: rgba(11, 14, 20, 0.78);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.3;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.25s ease,
+    transform 0.3s ease;
+}
+
+.story-caption.in {
+  opacity: 1;
+  transform: translateX(-50%);
+}
+
+/* Episodes modal (Help menu). */
+.episodes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.episode {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.episode.playing {
+  background: rgba(124, 196, 255, 0.12);
+}
+
+.ep-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ep-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.ep-id {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+}
+
+.ep-tag {
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.ep-dur {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 /* ---- speaker badge (sound engine) ---- */
 
 .conn.speaker.on {

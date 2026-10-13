@@ -63,6 +63,10 @@ export class Director {
   private readonly incidentSeconds = new Map<string, number>();
   private time = 0;
   private dimmed = false;
+  /** While the focused company is paused (founder panic), characters and timers freeze mid-action. */
+  private paused = false;
+  /** Sound cues the office itself raises (the incident sign buzzer). Wired by main. */
+  onSound: ((name: "buzzer") => void) | null = null;
   private idleToggle = false;
   private lastJimLook = -Infinity;
   private readonly baseIntensity: { sun: number; sky: number };
@@ -89,7 +93,9 @@ export class Director {
     this.scene.add(office.group);
     this.syncBoard();
     office.setIncidentDays(this.incidentDays(company.id));
-    this.setDimmed(company.phase === "out_of_budget");
+    office.incidentSign.onReset = () => this.onSound?.("buzzer");
+    this.paused = company.phase === "paused";
+    this.setDimmed(company.phase === "out_of_budget" || this.paused);
 
     // Seats for meetings already in progress.
     for (const [meetingId, ids] of this.store.meetings) {
@@ -131,6 +137,8 @@ export class Director {
       this.office.setIncidentDays(this.incidentDays(this.officeCompanyId));
       this.office.update(dt);
     }
+    // Paused: everyone freezes mid-step, mid-gesture, mid-bubble; timers wait too.
+    if (this.paused) return;
     for (const ch of this.characters.values()) ch.update(dt);
     // Fire due timers (sim time, so the speed multiplier applies).
     for (let i = this.timers.length - 1; i >= 0; i--) {
@@ -157,7 +165,17 @@ export class Director {
       case "company_founded":
         break;
       case "company_phase": {
-        this.setDimmed(e.phase === "out_of_budget");
+        const wasPaused = this.paused;
+        this.paused = e.phase === "paused";
+        this.setDimmed(e.phase === "out_of_budget" || this.paused);
+        if (wasPaused && !this.paused) {
+          // Everyone jolts back to life: a small squash, no state change.
+          for (const ch of this.characters.values()) {
+            const s = ch.state;
+            ch.setState("arrive");
+            ch.setState(s);
+          }
+        }
         this.byRole("ceo")?.say(`Phase: ${e.phase.replace(/_/g, " ")}`, 3);
         break;
       }
@@ -415,7 +433,7 @@ export class Director {
       }
       case "build_failed": {
         office.flashAlarm(4);
-        office.setIncidentDays(0);
+        office.incidentSign.reset();
         this.byRole("qa")?.say(`Build failed: ${e.summary}`, 4);
         this.byRole("qa")?.setExpression("frown", 4);
         for (const ch of this.characters.values()) {

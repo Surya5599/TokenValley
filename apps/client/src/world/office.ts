@@ -67,6 +67,59 @@ export class Office {
   private incidentDays = -1;
   private taskTitles: string[] = [];
   private time = 0;
+  // Story props: the QA bug jar, the copier (printer) and its jam sprite.
+  private readonly bugs = new THREE.Group();
+  private bugCount = 0;
+  private bugJarPos = new THREE.Vector3();
+  private copierMesh: THREE.Mesh | null = null;
+  private copierHome = new THREE.Vector3();
+  private jamSprite: THREE.Sprite | null = null;
+  private jamUntil = 0;
+
+  /** "Days without incident" sign: `reset()` zeroes it and raises `onReset` (the buzzer). */
+  readonly incidentSign = {
+    onReset: null as (() => void) | null,
+    reset: (): void => {
+      this.setIncidentDays(0);
+      this.incidentSign.onReset?.();
+    },
+  };
+
+  /** The jar on the QA bench: `setCount(n)` stacks n tiny bug spheres inside it. */
+  readonly bugJar = {
+    setCount: (n: number): void => {
+      const want = Math.max(0, Math.min(24, Math.floor(n)));
+      if (want === this.bugCount) return;
+      while (this.bugs.children.length > want) {
+        const last = this.bugs.children[this.bugs.children.length - 1];
+        if (last) this.bugs.remove(last);
+      }
+      const geo = this.bugGeo;
+      for (let i = this.bugs.children.length; i < want; i++) {
+        const m = new THREE.Mesh(geo, i % 3 === 0 ? this.darkMat : this.bugMat);
+        const layer = Math.floor(i / 3);
+        const a = (i % 3) * 2.1 + layer * 0.7;
+        m.position.set(this.bugJarPos.x + Math.cos(a) * 0.07, this.bugJarPos.y - 0.13 + layer * 0.055, this.bugJarPos.z + Math.sin(a) * 0.07);
+        m.castShadow = false;
+        this.bugs.add(m);
+      }
+      this.bugCount = want;
+    },
+  };
+
+  /** The copier: `jam()` shakes it and shows a paper-jam sprite for a few seconds; `clear()` ends it early. */
+  readonly printer = {
+    jam: (seconds = 4): void => {
+      this.jamUntil = this.time + seconds;
+      if (this.jamSprite) this.jamSprite.visible = true;
+    },
+    clear: (): void => {
+      this.jamUntil = 0;
+    },
+  };
+  private readonly bugGeo = new THREE.SphereGeometry(0.035, 6, 5);
+  private readonly bugMat: THREE.Material;
+  private readonly glassMat: THREE.Material;
 
   // Shared materials.
   private readonly deskMat: THREE.Material;
@@ -102,7 +155,11 @@ export class Office {
     this.metalMat = solid(0xcdc7df);
     this.chairMat = solid(PASTEL.blue);
     this.skirtMat = solid(pastel(palette.primary));
-    this.materials.push(this.deskMat, this.accentMat, this.darkMat, this.woodMat, this.whiteMat, this.plantMat, this.potMat, this.metalMat, this.chairMat, this.skirtMat);
+    this.bugMat = solid(0x7bb26a);
+    this.glassMat = toonMat(0xdcf3ff, { transparent: true, opacity: 0.35, depthWrite: false });
+    this.materials.push(this.deskMat, this.accentMat, this.darkMat, this.woodMat, this.whiteMat, this.plantMat, this.potMat, this.metalMat, this.chairMat, this.skirtMat, this.bugMat, this.glassMat);
+    this.geometries.push(this.bugGeo);
+    this.group.add(this.bugs);
 
     this.buildFloorAndPerimeter();
     this.buildRooms();
@@ -196,6 +253,20 @@ export class Office {
     }
     if (this.bell) this.bell.rotation.z = t < this.bellRingUntil ? Math.sin(t * 30) * 0.25 : 0;
     for (const m of this.monitors.values()) m.mat.emissive.setHex(t < m.until ? 0x2fb38a : 0x000000);
+    if (this.copierMesh) {
+      const jammed = t < this.jamUntil;
+      if (jammed) {
+        this.copierMesh.position.set(this.copierHome.x + Math.sin(t * 41) * 0.03, this.copierHome.y + Math.abs(Math.sin(t * 23)) * 0.02, this.copierHome.z + Math.cos(t * 37) * 0.03);
+        this.copierMesh.rotation.z = Math.sin(t * 29) * 0.03;
+      } else {
+        this.copierMesh.position.copy(this.copierHome);
+        this.copierMesh.rotation.z = 0;
+      }
+      if (this.jamSprite) {
+        this.jamSprite.visible = jammed;
+        if (jammed) this.jamSprite.position.y = this.copierHome.y + 0.95 + Math.sin(t * 5) * 0.04;
+      }
+    }
   }
 
   dispose(): void {
@@ -546,20 +617,49 @@ export class Office {
     }
     const copier = s("copier");
     if (copier) {
-      this.box(copier.x, copier.z + 1, copier.x, copier.z + 1, 1.1, this.metalMat);
+      this.copierMesh = this.box(copier.x, copier.z + 1, copier.x, copier.z + 1, 1.1, this.metalMat);
+      this.copierHome.copy(this.copierMesh.position);
       const trayGeo = new THREE.BoxGeometry(0.6, 0.05, 0.4);
       this.track(trayGeo);
       const tray = new THREE.Mesh(trayGeo, this.whiteMat);
       tray.position.copy(tileToWorld({ x: copier.x, z: copier.z + 1 }, 0.9)).add(new THREE.Vector3(0, 0, -0.5));
       this.group.add(tray);
       this.faceTiles.set("copier", { x: copier.x, z: copier.z + 1 });
+      // Paper-jam sprite: a crumpled sheet with a red "JAM" tag, hidden until printer.jam().
+      const { canvas, ctx } = makeCanvas(128, 96);
+      ctx.fillStyle = "#fffaf5";
+      ctx.beginPath();
+      ctx.moveTo(18, 30);
+      ctx.lineTo(60, 10);
+      ctx.lineTo(110, 26);
+      ctx.lineTo(100, 70);
+      ctx.lineTo(56, 88);
+      ctx.lineTo(14, 68);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "#3b3a4f";
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      ctx.fillStyle = "#e0533d";
+      ctx.font = "bold 30px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("JAM", 62, 50);
+      const tex = canvasTexture(canvas);
+      const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+      this.materials.push(mat);
+      this.jamSprite = new THREE.Sprite(mat);
+      this.jamSprite.scale.set(0.9, 0.68, 1);
+      this.jamSprite.position.copy(this.copierHome).add(new THREE.Vector3(0, 0.95, 0));
+      this.jamSprite.visible = false;
+      this.group.add(this.jamSprite);
     }
     for (const id of ["design_corner", "qa_bench"]) {
       const p = s(id);
       if (!p) continue;
       this.desk(p.x - 1, p.z - 1, p.x + 1, p.z - 1, id === "qa_bench" ? this.woodMat : this.deskMat, id);
       this.faceTiles.set(id, { x: p.x, z: p.z - 1 });
-      if (id === "qa_bench") this.jar(p.x + 1, p.z - 1);
+      if (id === "qa_bench") this.bugJarPos.copy(this.jar(p.x + 1, p.z - 1, true));
     }
     // Filing cabinets, plants and the incident sign along the front wall.
     const front = D - 2;
@@ -723,13 +823,15 @@ export class Office {
     this.group.add(m);
   }
 
-  private jar(x: number, z: number): void {
+  /** A desk jar; returns its centre so props can be stacked inside it. */
+  private jar(x: number, z: number, glass = false): THREE.Vector3 {
     const geo = new THREE.CylinderGeometry(0.16, 0.16, 0.3, 8);
     this.track(geo);
-    const m = new THREE.Mesh(geo, this.whiteMat);
+    const m = new THREE.Mesh(geo, glass ? this.glassMat : this.whiteMat);
     const p = tileToWorld({ x, z }, DESK_H + 0.15);
     m.position.set(p.x + 0.2, p.y, p.z + 0.2);
     this.group.add(m);
+    return m.position.clone();
   }
 
   private calculator(x: number, z: number): void {

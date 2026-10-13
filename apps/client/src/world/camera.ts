@@ -23,7 +23,32 @@ interface Cinematic {
   target: THREE.Vector3 | (() => THREE.Vector3 | null);
   elapsed: number;
   duration: number;
-  ease: "smooth" | "linear";
+  ease: CineEase;
+}
+
+/** `whip` overshoots a little and settles, for "who said that" pans. */
+export type CineEase = "smooth" | "linear" | "whip";
+
+/** Handheld micro-jitter: two slow noise channels (pan, tilt), each a sum of incommensurate sines. */
+const JITTER_PAN = [
+  [0.37, 1.0],
+  [0.91, 0.55],
+  [1.73, 0.3],
+] as const;
+const JITTER_TILT = [
+  [0.29, 1.0],
+  [0.83, 0.5],
+  [1.41, 0.35],
+] as const;
+const JITTER_AMP = 0.0045; // radians at full strength
+/** Jitter fades in below this orbit radius (overview shots stay rock steady). */
+const JITTER_FAR = 24;
+const JITTER_NEAR = 12;
+
+function noise(channels: readonly (readonly [number, number])[], t: number, phase: number): number {
+  let v = 0;
+  for (const [f, a] of channels) v += Math.sin(t * f * Math.PI * 2 + phase * f) * a;
+  return v / channels.length;
 }
 
 const PRESETS: Record<OrbitMode, Omit<Framing, "target">> = {
@@ -68,6 +93,15 @@ export class CameraRig {
   private readonly tmp = new THREE.Vector3();
   private el: HTMLElement | null = null;
   private cine: Cinematic | null = null;
+  /** Mockumentary handheld jitter (story mode only). Applied to close framings. */
+  handheld = false;
+  private jitterT = 0;
+  private readonly jitterPhase = Math.random() * 100;
+  /** Camera-owned timers in wall seconds (snap zoom release and the like). */
+  private readonly timers: { at: number; fn: () => void }[] = [];
+  private wall = 0;
+  /** Set while a snap zoom holds the framing, so the release can restore what was there. */
+  private snapRestore: { cine: Cinematic | null; framing: Framing } | null = null;
 
   // First person state.
   private readonly fpPos = new THREE.Vector3();
@@ -108,8 +142,11 @@ export class CameraRig {
    * given one over `seconds` (0 snaps), then holds there. A function target
    * keeps being tracked after the tween, like follow mode. Any setMode cancels it.
    */
-  cinematicTo(target: THREE.Vector3 | (() => THREE.Vector3 | null), radius: number, elevation: number, azimuth: number, seconds: number, ease: "smooth" | "linear" = "smooth"): void {
+  cinematicTo(target: THREE.Vector3 | (() => THREE.Vector3 | null), radius: number, elevation: number, azimuth: number, seconds: number, ease: CineEase = "smooth"): void {
     if (this.mode === "firstperson") return;
+    // A new move cancels a snap zoom in flight; its release would otherwise yank the camera back.
+    this.snapRestore = null;
+    this.timers.length = 0;
     const from: Framing = { target: this.current.target.clone(), radius: this.current.radius, elevation: this.current.elevation, azimuth: this.current.azimuth };
     this.cine = { from, radius, elevation, azimuth, target, elapsed: 0, duration: Math.max(0, seconds), ease };
     if (seconds <= 0) this.updateCinematic(0);
@@ -123,6 +160,63 @@ export class CameraRig {
   /** Hands the camera back to the current mode's framing. */
   endCinematic(): void {
     this.cine = null;
+    this.snapRestore = null;
+    this.timers.length = 0;
+  }
+
+  /** The orbit framing right now (radius, elevation, azimuth); the target is a copy. */
+  get framing(): Framing {
+    return { target: this.current.target.clone(), radius: this.current.radius, elevation: this.current.elevation, azimuth: this.current.azimuth };
+  }
+
+  // ---- mockumentary moves -------------------------------------------------------
+
+  /**
+   * Snap zoom: a 120 ms push toward `target` (radius / factor), a hold, then a
+   * 400 ms ease back to whatever framing was there before, tracking included.
+   */
+  snapZoom(target: THREE.Vector3 | (() => THREE.Vector3 | null), factor = 1.35, hold = 1.0, elevation?: number): void {
+    if (this.mode === "firstperson") return;
+    const prev = this.snapRestore ?? { cine: this.cine, framing: this.framing };
+    const { radius, azimuth } = this.current;
+    this.cinematicTo(target, radius / factor, elevation ?? this.current.elevation, azimuth, 0.12, "linear");
+    this.snapRestore = prev;
+    this.timers.push({
+      at: this.wall + 0.12 + hold,
+      fn: () => {
+        const r = this.snapRestore;
+        if (!r) return;
+        // Ease back to the old framing, following the old live target if it had one.
+        const back = r.cine && typeof r.cine.target === "function" ? r.cine.target : r.framing.target;
+        this.cinematicTo(back, r.framing.radius, r.framing.elevation, r.framing.azimuth, 0.4, "smooth");
+        this.snapRestore = null;
+        if (r.cine) {
+          // Hand the tracking cinematic back once the ease lands.
+          const c = r.cine;
+          this.timers.push({
+            at: this.wall + 0.4,
+            fn: () => {
+              c.elapsed = c.duration;
+              this.cine = c;
+            },
+          });
+        } else {
+          this.timers.push({ at: this.wall + 0.4, fn: () => (this.cine = null) });
+        }
+      },
+    });
+  }
+
+  /** Slow dolly toward `target` over `seconds`, keeping elevation and azimuth. */
+  pushIn(target: THREE.Vector3 | (() => THREE.Vector3 | null), seconds: number, factor = 1.6): void {
+    const { radius, elevation, azimuth } = this.current;
+    this.cinematicTo(target, radius / factor, elevation, azimuth, seconds, "linear");
+  }
+
+  /** Whip pan to `target` ("who said that"): a quarter second with a little overshoot. */
+  whipPan(target: THREE.Vector3 | (() => THREE.Vector3 | null), radius?: number, elevation?: number): void {
+    const { azimuth } = this.current;
+    this.cinematicTo(target, radius ?? this.current.radius, elevation ?? this.current.elevation, azimuth, 0.28, "whip");
   }
 
   /** Enters first-person at a world position with a yaw (0 looks down -z). */
@@ -227,6 +321,15 @@ export class CameraRig {
   }
 
   update(dt: number): void {
+    this.wall += dt;
+    this.jitterT += dt;
+    for (let i = this.timers.length - 1; i >= 0; i--) {
+      const t = this.timers[i];
+      if (t && t.at <= this.wall) {
+        this.timers.splice(i, 1);
+        t.fn();
+      }
+    }
     if (this.mode === "firstperson") {
       this.walk(dt);
       this.applyFirstPerson();
@@ -253,7 +356,7 @@ export class CameraRig {
     if (!c) return;
     c.elapsed += dt;
     const k = c.duration <= 0 ? 1 : Math.min(1, c.elapsed / c.duration);
-    const e = c.ease === "linear" ? k : k * k * (3 - 2 * k);
+    const e = c.ease === "linear" ? k : c.ease === "whip" ? 1 + 2.70158 * (k - 1) ** 3 + 1.70158 * (k - 1) ** 2 : k * k * (3 - 2 * k);
     const dest = typeof c.target === "function" ? (c.target() ?? c.from.target) : c.target;
     if (typeof c.target === "function") this.tmp.copy(dest).add(new THREE.Vector3(0, 0.8, 0));
     else this.tmp.copy(dest);
@@ -338,5 +441,14 @@ export class CameraRig {
     const r = Math.cos(elevation) * radius;
     this.camera.position.set(target.x + Math.sin(azimuth) * r, target.y + y, target.z + Math.cos(azimuth) * r);
     this.camera.lookAt(target);
+    if (this.handheld) {
+      // Operator sway: only on close framings, and fading in as the camera comes down.
+      const strength = THREE.MathUtils.clamp((JITTER_FAR - radius) / (JITTER_FAR - JITTER_NEAR), 0, 1);
+      if (strength > 0) {
+        const amp = JITTER_AMP * strength;
+        this.camera.rotation.y += noise(JITTER_PAN, this.jitterT, this.jitterPhase) * amp;
+        this.camera.rotation.x += noise(JITTER_TILT, this.jitterT, this.jitterPhase + 7) * amp * 0.7;
+      }
+    }
   }
 }

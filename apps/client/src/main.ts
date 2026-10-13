@@ -114,6 +114,12 @@ function bootstrap(): void {
     console.info(`[postfx] quality: ${q}`);
   };
   rig.followTarget = () => director.characterPosition(store.selectedAgentId);
+  director.onSound = (name) => audio.play(name);
+  /** Post-processing look and lens for a mode without moving the camera (story snap zooms, talking heads). */
+  const setLook = (mode: CameraMode) => {
+    fx.setMode(mode);
+    targetFov = FOV[mode];
+  };
 
   const ws = store.demo ? null : new WsClient(WS_URL);
 
@@ -365,7 +371,7 @@ function bootstrap(): void {
     store.connection = "connected";
     if (storyMode) {
       document.body.classList.add("story");
-      story = startStory({ store, director, rig, overlay, valley, overlayRoot, handleMessage, setCamera });
+      story = startStory({ store, director, rig, overlay, valley, overlayRoot, audio, handleMessage, setCamera, setLook });
     } else startDemo(handleMessage);
   }
 
