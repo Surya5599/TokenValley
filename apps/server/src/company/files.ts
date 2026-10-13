@@ -62,6 +62,7 @@ export function readCompanyFile(path: string): CompanyFile {
     rosterTemplate: str("roster") ?? "startup",
     modelOverrides,
     maxTurns: str("budget_turns") ? Number(str("budget_turns")) : 100,
+    maxTokens: str("budget_tokens") ? Number(str("budget_tokens")) : 5_000_000,
   });
   return { slug, path, input };
 }
@@ -121,6 +122,23 @@ export function watchCompanyFiles(onFile: (file: CompanyFile) => void): () => vo
     watcher?.close();
     clearInterval(poll);
   };
+}
+
+/** Writes new caps into the front matter of companies/<slug>/company.md, keeping everything else. */
+export function updateCompanyFileBudget(slug: string, maxTurns: number, maxTokens: number): void {
+  const file = join(COMPANIES_DIR, slug, "company.md");
+  if (!existsSync(file)) return;
+  const src = readFileSync(file, "utf8");
+  const m = src.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!m) return;
+  let fm = m[1]!;
+  const setKey = (key: string, value: number) => {
+    const re = new RegExp(`^${key}:.*$`, "m");
+    fm = re.test(fm) ? fm.replace(re, `${key}: ${value}`) : `${fm}\n${key}: ${value}`;
+  };
+  setKey("budget_turns", maxTurns);
+  setKey("budget_tokens", maxTokens);
+  writeFileSync(file, `---\n${fm}\n---\n${m[2]}`);
 }
 
 /** The whole team chat as a markdown transcript, next to the company file. */

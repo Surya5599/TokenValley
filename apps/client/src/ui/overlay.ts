@@ -1,4 +1,4 @@
-import { FoundCompanyInput, ROLE_LABEL, type Company, type Event, type ModelTier, type RoleId, type TaskStatus } from "@tokenvalley/shared";
+import { FoundCompanyInput, ROLE_LABEL, type Company, type CompanyPhase, type Event, type ModelTier, type RoleId, type TaskStatus } from "@tokenvalley/shared";
 import { CHANNEL_FOUNDER, CHANNEL_GENERAL, FOUNDER_ID, type CameraMode, type ChatLine, type CompanyStatus, type PanelTab, type Store } from "../state/store";
 import { ROLE_COLOR } from "../world/character";
 
@@ -11,6 +11,7 @@ export interface OverlayActions {
   resolveApproval: (approvalId: string, status: "approved" | "rejected", comment: string | null) => void;
   sendFounderMessage: (companyId: string, text: string) => void;
   setAgentPersona: (agentId: string, name: string, style: string, job: string) => void;
+  setCompanyBudget: (companyId: string, maxTurns: number, maxTokens: number) => void;
   pauseCompany: (companyId: string) => void;
   resumeCompany: (companyId: string) => void;
   panic: () => void;
@@ -69,6 +70,18 @@ const COLLAPSE_MS = 2 * 60 * 1000;
 const PERSONA_NAME_MAX = 60;
 const PERSONA_STYLE_MAX = 2000;
 const PERSONA_JOB_MAX = 4000;
+/** Mirrors the limits of the set_company_budget client message in the shared schema. */
+const BUDGET_TURNS_MAX = 100_000;
+const BUDGET_TOKENS_MAX = 1_000_000_000;
+const BUDGET_TOPUPS = [25, 100];
+
+/** Phases that get a one-line notice above the chat, telling the founder what to do next. */
+const PHASE_NOTICE: Partial<Record<CompanyPhase, string>> = {
+  awaiting_approval: "Waiting on you: open Actions to approve or reject.",
+  out_of_budget: "Out of budget: edit the budget to resume.",
+  paused: "Paused: resume from Actions.",
+  shipped: "Shipped: the CEO still answers messages; new work reopens the company.",
+};
 
 const PANEL_TABS: { tab: PanelTab; label: string }[] = [
   { tab: "company", label: "Company" },
@@ -206,6 +219,8 @@ export function describeEvent(e: Event, store: Store): { text: string; tone: "no
       return { text: `Budget warning: ${e.spend.turns}/${e.budget.maxTurns} turns`, tone: "alert" };
     case "budget_exhausted":
       return { text: "Budget exhausted", tone: "alert" };
+    case "budget_changed":
+      return { text: `Budget set to ${e.budget.maxTurns} turns, ${fmtTokens(e.budget.maxTokens)} tokens`, tone: "good" };
     case "spend_updated":
       return { text: `Spend: ${e.spend.turns} turns, ${fmtTokens(e.spend.inputTokens + e.spend.outputTokens)} tokens`, tone: "normal" };
     case "request_approval":
@@ -257,6 +272,16 @@ export class Overlay {
   private readonly personaNpcNote: HTMLElement;
   private readonly personaError: HTMLElement;
   private personaOpenId: string | null = null;
+  private readonly budgetBackdrop: HTMLElement;
+  private readonly budgetTitle: HTMLElement;
+  private readonly budgetTurns: HTMLInputElement;
+  private readonly budgetTokens: HTMLInputElement;
+  private readonly budgetTurnsUsed: HTMLElement;
+  private readonly budgetTokensUsed: HTMLElement;
+  private readonly budgetTokensHint: HTMLElement;
+  private readonly budgetFileHint: HTMLElement;
+  private readonly budgetError: HTMLElement;
+  private budgetOpenId: string | null = null;
   private inboxDraft = "";
   private scheduled = false;
   private lastFeedKey = "";
@@ -442,6 +467,73 @@ export class Overlay {
       if (e.target === this.personaBackdrop) this.closePersona();
     });
     root.append(this.personaBackdrop);
+
+    // Budget editor modal.
+    this.budgetBackdrop = el("div", "modal-backdrop");
+    const bmodal = el("div", "modal budget");
+    this.budgetTitle = el("h2", "", "Budget");
+    bmodal.append(this.budgetTitle);
+    const bform = el("form");
+    const bfield = (label: string, input: HTMLElement, used: HTMLElement, hint?: HTMLElement) => {
+      const wrap = el("div");
+      wrap.append(el("label", "", label), input);
+      if (hint) wrap.append(hint);
+      wrap.append(used);
+      return wrap;
+    };
+    this.budgetTurns = el("input");
+    this.budgetTurns.name = "maxTurns";
+    this.budgetTurns.type = "number";
+    this.budgetTurns.min = "1";
+    this.budgetTurns.step = "1";
+    this.budgetTurns.max = String(BUDGET_TURNS_MAX);
+    this.budgetTurnsUsed = el("div", "hintline used");
+    bform.append(bfield("Turn cap", this.budgetTurns, this.budgetTurnsUsed));
+    const topups = el("div", "topups");
+    for (const n of BUDGET_TOPUPS) {
+      const b = el("button", "topup", `+${n} turns`);
+      b.type = "button";
+      b.title = `Add ${n} turns to the turn cap`;
+      b.addEventListener("click", () => {
+        const cur = Math.max(0, Math.floor(Number(this.budgetTurns.value) || 0));
+        this.budgetTurns.value = String(Math.min(BUDGET_TURNS_MAX, cur + n));
+        this.budgetError.textContent = "";
+      });
+      topups.append(b);
+    }
+    bform.append(topups);
+    this.budgetTokens = el("input");
+    this.budgetTokens.name = "maxTokens";
+    this.budgetTokens.type = "number";
+    this.budgetTokens.min = "1";
+    this.budgetTokens.step = "1";
+    this.budgetTokens.max = String(BUDGET_TOKENS_MAX);
+    this.budgetTokensHint = el("div", "hintline");
+    this.budgetTokensUsed = el("div", "hintline used");
+    bform.append(bfield("Token cap", this.budgetTokens, this.budgetTokensUsed, this.budgetTokensHint));
+    this.budgetTokens.addEventListener("input", () => this.renderBudgetHint());
+    this.budgetFileHint = el("div", "npc-note");
+    bform.append(this.budgetFileHint);
+    this.budgetError = el("div", "error");
+    bform.append(this.budgetError);
+    const bactions = el("div", "actions");
+    const bcancel = el("button", "", "Cancel");
+    bcancel.type = "button";
+    bcancel.addEventListener("click", () => this.closeBudget());
+    const bsave = el("button", "primary", "Save");
+    bsave.type = "submit";
+    bactions.append(bcancel, bsave);
+    bform.append(bactions);
+    bform.addEventListener("submit", (e) => {
+      e.preventDefault();
+      this.submitBudget();
+    });
+    bmodal.append(bform);
+    this.budgetBackdrop.append(bmodal);
+    this.budgetBackdrop.addEventListener("click", (e) => {
+      if (e.target === this.budgetBackdrop) this.closeBudget();
+    });
+    root.append(this.budgetBackdrop);
 
     store.onChange(() => this.schedule());
     this.render();
@@ -819,6 +911,10 @@ export class Overlay {
       this.closePersona();
       return true;
     }
+    if (this.isBudgetOpen()) {
+      this.closeBudget();
+      return true;
+    }
     if (this.isApprovalOpen()) {
       this.closeApproval();
       return true;
@@ -876,6 +972,80 @@ export class Overlay {
     const job = npc ? "" : this.personaJob.value;
     this.personaError.textContent = "";
     this.actions.setAgentPersona(id, name.slice(0, PERSONA_NAME_MAX), style.slice(0, PERSONA_STYLE_MAX), job.slice(0, PERSONA_JOB_MAX));
+  }
+
+  // ---- budget modal -------------------------------------------------------------
+
+  isBudgetOpen(): boolean {
+    return this.budgetOpenId !== null;
+  }
+
+  /** Opens the budget editor pre-filled from the company's current budget. Only live companies can be edited. */
+  openBudget(companyId: string): void {
+    const c = this.store.companies.get(companyId);
+    if (!c || !c.live) return;
+    this.budgetOpenId = companyId;
+    this.budgetTitle.textContent = `Budget for ${c.name}`;
+    this.budgetTurns.value = String(c.budget.maxTurns);
+    this.budgetTokens.value = String(c.budget.maxTokens);
+    this.budgetFileHint.textContent = `Also written to companies/${c.slug}/company.md`;
+    this.budgetError.textContent = "";
+    this.renderBudgetUsage(c);
+    this.renderBudgetHint();
+    this.budgetBackdrop.classList.add("open");
+    this.budgetTurns.focus();
+    this.budgetTurns.select();
+  }
+
+  /** Closes the editor; with an id, only if that company is the one being edited. */
+  closeBudget(companyId?: string): void {
+    if (companyId !== undefined && this.budgetOpenId !== companyId) return;
+    this.budgetOpenId = null;
+    this.budgetBackdrop.classList.remove("open");
+  }
+
+  private renderBudgetUsage(c: Company): void {
+    this.budgetTurnsUsed.textContent = `used ${c.spend.turns} of ${c.budget.maxTurns}`;
+    const tokens = c.spend.inputTokens + c.spend.outputTokens;
+    this.budgetTokensUsed.textContent = `used ${fmtTokens(tokens)} of ${fmtTokens(c.budget.maxTokens)}`;
+  }
+
+  /** The helper line under the token cap ("5.0M tokens"), following the input as it is typed. */
+  private renderBudgetHint(): void {
+    const n = Number(this.budgetTokens.value);
+    this.budgetTokensHint.textContent = Number.isFinite(n) && n > 0 ? `${fmtTokens(Math.floor(n))} tokens` : "Tokens, as a whole number";
+  }
+
+  private submitBudget(): void {
+    const id = this.budgetOpenId;
+    if (!id) return;
+    const c = this.store.companies.get(id);
+    if (!c) {
+      this.closeBudget();
+      return;
+    }
+    const parse = (raw: string, max: number, what: string): number | string => {
+      const t = raw.trim();
+      if (!/^\d+$/.test(t)) return `${what} must be a whole number.`;
+      const n = Number(t);
+      if (!Number.isSafeInteger(n) || n < 1) return `${what} must be at least 1.`;
+      if (n > max) return `${what} cannot exceed ${max.toLocaleString()}.`;
+      return n;
+    };
+    const turns = parse(this.budgetTurns.value, BUDGET_TURNS_MAX, "Turn cap");
+    if (typeof turns === "string") {
+      this.budgetError.textContent = turns;
+      this.budgetTurns.focus();
+      return;
+    }
+    const tokens = parse(this.budgetTokens.value, BUDGET_TOKENS_MAX, "Token cap");
+    if (typeof tokens === "string") {
+      this.budgetError.textContent = tokens;
+      this.budgetTokens.focus();
+      return;
+    }
+    this.budgetError.textContent = "";
+    this.actions.setCompanyBudget(id, turns, tokens);
   }
 
   // ---- panel tabs / chat ---------------------------------------------------------
@@ -1063,6 +1233,12 @@ export class Overlay {
     this.renderTop();
     this.renderPanel();
     this.renderFeed();
+    // Keep the "used x of y" lines honest while the budget editor is open.
+    if (this.budgetOpenId) {
+      const c = this.store.companies.get(this.budgetOpenId);
+      if (c) this.renderBudgetUsage(c);
+      else this.closeBudget();
+    }
   }
 
   private renderTop(): void {
@@ -1115,7 +1291,18 @@ export class Overlay {
     }
 
     // Budget.
-    panel.append(el("h3", "", "Spend vs budget"));
+    const budgetHead = el("h3", "with-action", "Spend vs budget");
+    const editBudget = el("button", "icon edit", "✎");
+    editBudget.type = "button";
+    editBudget.setAttribute("aria-label", `Edit budget for ${c.name}`);
+    editBudget.disabled = !c.live;
+    editBudget.title = c.live ? "Edit budget" : "Set in the company file";
+    editBudget.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      this.openBudget(c.id);
+    });
+    budgetHead.append(editBudget);
+    panel.append(budgetHead);
     const turnsPct = c.spend.turns / Math.max(1, c.budget.maxTurns);
     const tokens = c.spend.inputTokens + c.spend.outputTokens;
     const tokPct = tokens / Math.max(1, c.budget.maxTokens);
@@ -1262,9 +1449,26 @@ export class Overlay {
 
     const head = el("div", "chat-head");
     head.append(el("span", "chat-company", c.name));
+    head.append(el("span", "phase", c.phase.replace(/_/g, " ")));
     const activeEntry = keys.find((k) => k.key === active);
     head.append(el("span", "chat-channel", activeEntry?.label ?? active));
     panel.append(head);
+
+    // One-line notice for phases where the founder has to do something.
+    const notice = PHASE_NOTICE[c.phase];
+    if (notice) {
+      const n = el("div", `chat-notice ${c.phase}`);
+      if (c.phase === "out_of_budget") {
+        n.append("Out of budget: ");
+        const link = el("button", "linkish", "edit the budget");
+        link.type = "button";
+        link.disabled = !c.live;
+        link.title = c.live ? "Edit budget" : "Set in the company file";
+        link.addEventListener("click", () => this.openBudget(c.id));
+        n.append(link, " to resume.");
+      } else n.textContent = notice;
+      panel.append(n);
+    }
 
     const body = el("div", "chat-body");
     // Channel list.

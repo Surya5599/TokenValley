@@ -5,7 +5,7 @@ import { Town } from "./town.js";
 import { FakeGenerator } from "./fake/generator.js";
 import { CompanyRegistry, type CompanyRecord } from "./company/registry.js";
 import { foundCompany } from "./company/founder.js";
-import { watchCompanyFiles, writeConversationFile, writeStatusFile } from "./company/files.js";
+import { updateCompanyFileBudget, watchCompanyFiles, writeConversationFile, writeStatusFile } from "./company/files.js";
 import { runAgentTurn } from "./agent/turn.js";
 import { Scheduler } from "./scheduler.js";
 import { REPO_ROOT, savePersona } from "./roles.js";
@@ -201,6 +201,28 @@ wss.on("connection", (ws: WebSocket) => {
         }
         break;
       }
+      case "set_company_budget": {
+        const rec = records.get(msg.companyId);
+        if (!rec) {
+          send({ kind: "error", message: "Only live companies have a budget to edit." });
+          break;
+        }
+        rec.company.budget = { maxTurns: msg.maxTurns, maxTokens: msg.maxTokens };
+        town.emit({ ...ev(rec.company.id), type: "budget_changed", budget: rec.company.budget });
+        const s = rec.company.spend;
+        const under = s.turns < msg.maxTurns && s.inputTokens + s.outputTokens < msg.maxTokens;
+        if (rec.company.phase === "out_of_budget" && under) {
+          town.emit({ ...ev(rec.company.id), type: "company_phase", phase: "building" });
+          scheduler.resume(rec.company.id);
+        }
+        registry.save(rec);
+        try {
+          updateCompanyFileBudget(rec.company.slug, msg.maxTurns, msg.maxTokens);
+        } catch (err) {
+          console.warn(`[tokenvalley] could not write budget to company.md for ${rec.company.slug}:`, err instanceof Error ? err.message : err);
+        }
+        break;
+      }
       case "set_agent_persona": {
         const agent = town.agents.get(msg.agentId);
         const rec = agent ? records.get(agent.companyId) : undefined;
@@ -257,6 +279,7 @@ watchCompanyFiles((file) => {
     const rec = [...records.values()].find((r) => r.company.slug === file.slug);
     if (rec && (rec.company.budget.maxTurns !== file.input.maxTurns || rec.company.budget.maxTokens !== file.input.maxTokens)) {
       rec.company.budget = { maxTurns: file.input.maxTurns, maxTokens: file.input.maxTokens };
+      town.emit({ ...ev(rec.company.id), type: "budget_changed", budget: rec.company.budget });
       if (rec.company.phase === "out_of_budget" && rec.company.spend.turns < rec.company.budget.maxTurns) {
         town.emit({ ...ev(rec.company.id), type: "company_phase", phase: "building" });
         scheduler.resume(rec.company.id);

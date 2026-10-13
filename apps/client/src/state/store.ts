@@ -418,6 +418,9 @@ export class Store {
           company.phase = "out_of_budget";
         }
         break;
+      case "budget_changed":
+        if (company) company.budget = { ...e.budget };
+        break;
       case "request_approval":
         this.approvals.set(e.approval.id, e.approval);
         if (company) company.phase = "awaiting_approval";

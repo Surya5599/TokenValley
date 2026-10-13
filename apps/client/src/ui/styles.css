@@ -1477,6 +1477,102 @@ button.danger {
   min-height: 0;
 }
 
+/* ---- budget editor ---- */
+
+.modal.budget {
+  width: 400px;
+}
+
+.modal .hintline.used {
+  color: var(--text);
+  opacity: 0.75;
+}
+
+.modal .topups {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.modal .topup {
+  font-size: 12px;
+  padding: 3px 10px;
+}
+
+/* Section headers that carry an action button on the right. */
+.panel h3.with-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.panel h3.with-action button.icon {
+  margin: -4px 0;
+}
+
+button.icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: transparent;
+  color: var(--muted);
+}
+
+/* Phase badge and notice in the chat head. */
+.chat-head .phase {
+  margin-bottom: 0;
+  flex: none;
+  align-self: center;
+}
+
+.chat-notice {
+  flex: none;
+  font-size: 12px;
+  color: var(--muted);
+  margin: -4px 0 8px;
+  padding: 5px 9px;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.05);
+  border-left: 3px solid var(--grey);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-notice.awaiting_approval {
+  border-left-color: var(--accent);
+}
+
+.chat-notice.out_of_budget {
+  border-left-color: var(--red);
+}
+
+.chat-notice.shipped {
+  border-left-color: var(--green);
+}
+
+button.linkish {
+  font: inherit;
+  font-size: 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+button.linkish:hover {
+  background: none;
+  color: var(--text);
+}
+
+button.linkish:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
 .modal .npc-note {
   color: var(--muted);
   font-size: 12px;

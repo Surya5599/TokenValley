@@ -233,6 +233,7 @@ export const Event = z.discriminatedUnion("type", [
   z.object({ ...base, type: z.literal("budget_warning"), spend: Spend, budget: Budget }),
   z.object({ ...base, type: z.literal("budget_exhausted"), spend: Spend, budget: Budget }),
   z.object({ ...base, type: z.literal("spend_updated"), spend: Spend }),
+  z.object({ ...base, type: z.literal("budget_changed"), budget: Budget }),
   z.object({ ...agentBase, type: z.literal("request_approval"), approval: Approval }),
   z.object({ ...base, type: z.literal("approval_resolved"), approval: Approval }),
   z.object({ ...agentBase, type: z.literal("subagent_spawned"), contractor: Agent }),
@@ -290,6 +291,8 @@ export const ClientMessage = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("resolve_approval"), approvalId: z.string(), status: ApprovalStatus, comment: z.string().nullable() }),
   /** The founder talks to the CEO. The CEO is the only agent who hears the founder. */
   z.object({ kind: z.literal("founder_message"), companyId: z.string(), text: z.string().min(1).max(2000) }),
+  /** Change a company's caps. Written back into its company.md so the file stays the source of truth. */
+  z.object({ kind: z.literal("set_company_budget"), companyId: z.string(), maxTurns: z.number().int().positive().max(100_000), maxTokens: z.number().int().positive().max(1_000_000_000) }),
   /** Edit an agent's persona. Written to companies/<slug>/agents/<role>.md and used from the next turn. */
   z.object({ kind: z.literal("set_agent_persona"), agentId: z.string(), name: z.string().min(1).max(60), style: z.string().max(2000), job: z.string().max(4000) }),
   z.object({ kind: z.literal("pause_company"), companyId: z.string() }),

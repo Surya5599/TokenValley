@@ -8,7 +8,7 @@ import { DEFAULT_MODEL, ROLE_HOME, type Agent, type Company, type Event, type Ro
 let seq = 0;
 const nextId = (prefix: string) => `${prefix}-${++seq}`;
 
-function company(id: string, name: string, tagline: string, plot: number, palette: Company["palette"]): Company {
+function company(id: string, name: string, tagline: string, plot: number, palette: Company["palette"], live = false): Company {
   return {
     id,
     slug: id,
@@ -16,7 +16,7 @@ function company(id: string, name: string, tagline: string, plot: number, palett
     tagline,
     brief: `${name} builds something small and useful.`,
     workspacePath: "",
-    live: false,
+    live,
     rosterTemplate: "startup",
     palette,
     budget: { maxTurns: 200, maxTokens: 2_000_000 },
@@ -114,7 +114,8 @@ export function demoSnapshot(): Extract<ServerMessage, { kind: "snapshot" }> {
     kind: "snapshot",
     town: { focusedCompanyId: A, poolSize: 3 },
     companies: [
-      company(A, "Dunder Mindflin", "Limitless paper in a paperless world.", 0, { primary: "#3d5a80", secondary: "#98c1d9", accent: "#ee6c4d", floor: "#d8c3a5", wall: "#e0fbfc" }),
+      // Marked live so the budget pencil is enabled in the demo.
+      company(A, "Dunder Mindflin", "Limitless paper in a paperless world.", 0, { primary: "#3d5a80", secondary: "#98c1d9", accent: "#ee6c4d", floor: "#d8c3a5", wall: "#e0fbfc" }, true),
       company(B, "Sabre Labs", "Printers that print. Mostly.", 1, { primary: "#386641", secondary: "#a7c957", accent: "#f2e8cf", floor: "#c9b79c", wall: "#f7f7f2" }),
     ],
     agents: [...Object.values(pf), ...Object.values(ll)],
@@ -206,6 +207,8 @@ function buildScript(): EventFactory[] {
     () => ({ ...base(A), type: "subagent_finished", agentId: pf.eng.id, contractorId: contractor.id }),
     () => ({ ...base(A), type: "budget_warning", spend: spendWarn, budget: budgetA }),
     () => ({ ...base(A), type: "spend_updated", spend: { ...spendWarn, turns: 168 } }),
+    // The founder tops the budget up; the bars drop from "warn" back to normal.
+    () => ({ ...base(A), type: "budget_changed", budget: { maxTurns: 300, maxTokens: 5_000_000 } }),
     () => ({ ...base(A), type: "idle_timeout", agentId: pf.qa.id }),
     () => ({ ...base(A), type: "agent_model_changed", agentId: pf.eng.id, model: "sonnet" }),
     () => ({ ...base(B), type: "budget_exhausted", spend: { turns: 200, inputTokens: 2_000_000, outputTokens: 250_000, estimatedUsd: 19.5 }, budget: budgetA }),
@@ -231,6 +234,8 @@ function buildScript(): EventFactory[] {
     () => ({ ...base(B), type: "company_phase", phase: "building" }),
     () => ({ ...base(B), type: "spend_updated", spend: { turns: 120, inputTokens: 900_000, outputTokens: 120_000, estimatedUsd: 9.4 } }),
     () => ({ ...base(A), type: "agent_model_changed", agentId: pf.eng.id, model: "opus" }),
+    // Back to the starting budget so the next loop's warning lands again.
+    () => ({ ...base(A), type: "budget_changed", budget: budgetA }),
   ];
 }
 

@@ -18,7 +18,8 @@ name: Pied Prompter
 tagline: Middle-out for your to-do list.
 workspace: ../../workspaces/pied-prompter   # folder the company is in charge of (relative to this file, or absolute)
 roster: startup                              # startup | solo-founder | enterprise
-budget_turns: 100
+budget_turns: 100                            # agent turns; one turn = one agent waking up and doing one thing
+budget_tokens: 5000000                       # input + output tokens, cache reads not counted
 models:
   engineer: opus
   ceo: haiku

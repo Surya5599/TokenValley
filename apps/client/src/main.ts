@@ -233,6 +233,17 @@ function bootstrap(): void {
         });
       }
     },
+    setCompanyBudget: (companyId, maxTurns, maxTokens) => {
+      if (ws) {
+        ws.send({ kind: "set_company_budget", companyId, maxTurns, maxTokens });
+      } else if (store.companies.has(companyId)) {
+        // Demo: apply locally by synthesising the event the server would send.
+        handleMessage({
+          kind: "event",
+          event: { id: `local-${Date.now()}`, companyId, timestamp: Date.now(), type: "budget_changed", budget: { maxTurns, maxTokens } },
+        });
+      }
+    },
     pauseCompany: (companyId) => {
       if (ws) ws.send({ kind: "pause_company", companyId });
       else localPhase(companyId, "paused");
@@ -280,6 +291,7 @@ function bootstrap(): void {
         if (m.event.type === "request_approval" && m.event.companyId === store.focusedCompanyId) overlay.openApproval(m.event.approval.id);
         if (m.event.type === "approval_resolved") overlay.closeApproval(m.event.approval.id);
         if (m.event.type === "agent_persona_changed") overlay.closePersona(m.event.agentId);
+        if (m.event.type === "budget_changed") overlay.closeBudget(m.event.companyId);
         break;
       case "focus_changed":
         focusCompany(m.companyId, false);

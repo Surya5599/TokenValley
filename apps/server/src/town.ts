@@ -136,6 +136,9 @@ export class Town {
       case "budget_warning":
         if (company) company.spend = e.spend;
         break;
+      case "budget_changed":
+        if (company) company.budget = e.budget;
+        break;
       case "budget_exhausted":
         if (company) {
           company.spend = e.spend;
