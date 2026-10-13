@@ -223,7 +223,23 @@ export function createPostFX(renderer: THREE.WebGLRenderer, scene: THREE.Scene, 
     current.ao += (target.ao - current.ao) * k;
     current.vignette += (target.vignette - current.vignette) * k;
     applyLook();
+    // Post-processed world first (layer 0 only), then the text overlay layer
+    // (name tags, bubbles, signs) drawn straight to the screen so the
+    // tilt-shift and AO never blur or darken it.
+    camera.layers.set(0);
     composer.render(dt);
+    const autoClear = renderer.autoClear;
+    const background = scene.background;
+    const fog = scene.fog;
+    renderer.autoClear = false;
+    scene.background = null; // a background would repaint over the composed frame
+    scene.fog = null;
+    camera.layers.set(1);
+    renderer.render(scene, camera);
+    camera.layers.set(0);
+    scene.background = background;
+    scene.fog = fog;
+    renderer.autoClear = autoClear;
   };
 
   const setOutlineSelection = (objects: THREE.Object3D[]): void => {

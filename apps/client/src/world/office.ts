@@ -649,6 +649,7 @@ export class Office {
       const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
       this.materials.push(mat);
       this.jamSprite = new THREE.Sprite(mat);
+      this.jamSprite.layers.set(1); // overlay layer, stays sharp
       this.jamSprite.scale.set(0.9, 0.68, 1);
       this.jamSprite.position.copy(this.copierHome).add(new THREE.Vector3(0, 0.95, 0));
       this.jamSprite.visible = false;

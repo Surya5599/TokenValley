@@ -3,7 +3,7 @@ import type { Agent, AnimState, ModelTier, RoleId } from "@tokenvalley/shared";
 import { Face, type Expression, type SmileBase } from "./faces";
 import { spotTile, tileToWorld, type Office, type Tile } from "./office";
 import { findPath, nearestWalkable } from "./pathfinding";
-import { PASTEL, pastel, toonMat } from "./style";
+import { PASTEL, pastel, toonMat, OVERLAY_LAYER } from "./style";
 import { canvasTexture, disposeSprite, makeCanvas, roundRect, wrapText } from "./textures";
 
 export type { Expression } from "./faces";
@@ -2084,8 +2084,9 @@ export class Character {
       ctx.textAlign = "center";
       ctx.fillText(badge.label, w - 68, h / 2 + 1);
     }
-    const mat = new THREE.SpriteMaterial({ map: canvasTexture(canvas), transparent: true, depthWrite: false });
+    const mat = new THREE.SpriteMaterial({ map: canvasTexture(canvas), transparent: true, depthWrite: false, depthTest: false });
     const sprite = new THREE.Sprite(mat);
+    sprite.layers.set(OVERLAY_LAYER);
     const ww = 1.9;
     sprite.scale.set(ww, (ww * h) / w, 1);
     sprite.position.set(0, 1.92, 0);
@@ -2096,6 +2097,7 @@ export class Character {
     const { canvas } = makeCanvas(512, 176);
     const mat = new THREE.SpriteMaterial({ map: canvasTexture(canvas), transparent: true, depthWrite: false, depthTest: false });
     const sprite = new THREE.Sprite(mat);
+    sprite.layers.set(OVERLAY_LAYER);
     const ww = 3.0;
     sprite.scale.set(ww, (ww * 176) / 512, 1);
     sprite.position.set(0, 2.65, 0);
@@ -2144,8 +2146,9 @@ export class Character {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText("!", 32, 34);
-    const mat = new THREE.SpriteMaterial({ map: canvasTexture(canvas), transparent: true, depthWrite: false });
+    const mat = new THREE.SpriteMaterial({ map: canvasTexture(canvas), transparent: true, depthWrite: false, depthTest: false });
     const sprite = new THREE.Sprite(mat);
+    sprite.layers.set(OVERLAY_LAYER);
     sprite.scale.set(0.45, 0.45, 1);
     sprite.position.set(0.5, 1.75, 0);
     return sprite;

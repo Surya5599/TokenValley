@@ -94,8 +94,9 @@ export function textSprite(text: string, opts: SpriteOptions = {}): THREE.Sprite
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(text, w / 2, h / 2, w - 16);
-  const mat = new THREE.SpriteMaterial({ map: canvasTexture(canvas), transparent: true, depthWrite: false });
+  const mat = new THREE.SpriteMaterial({ map: canvasTexture(canvas), transparent: true, depthWrite: false, depthTest: false });
   const sprite = new THREE.Sprite(mat);
+  sprite.layers.set(1); // overlay layer: drawn after post-processing, always sharp
   const ww = opts.worldWidth ?? 2;
   sprite.scale.set(ww, (ww * h) / w, 1);
   return sprite;

@@ -6,6 +6,9 @@ import * as THREE from "three";
  * textures (window grids, floor tiles) so detail is painted, not modelled.
  */
 
+/** Objects on this layer (name tags, speech bubbles, signs) are drawn after post-processing so they stay sharp. */
+export const OVERLAY_LAYER = 1;
+
 export const PASTEL = {
   ground: 0xf3c6d3,
   mint: 0x9fd8c9,
