@@ -40,6 +40,9 @@ export class StoryCards {
   private readonly lowerName: HTMLElement;
   private readonly lowerRole: HTMLElement;
   private readonly caption: HTMLElement;
+  private readonly black: HTMLElement;
+  private readonly credit: HTMLElement;
+  private readonly bigTitle: HTMLElement;
   private readonly introduced = new Set<string>();
   /** Story-time deadlines, so skipping beats hides these too. */
   private lowerUntil = -1;
@@ -59,6 +62,38 @@ export class StoryCards {
     root.append(this.lower);
     this.caption = el("div", "story-caption");
     root.append(this.caption);
+    this.black = el("div", "story-black");
+    root.append(this.black);
+    this.credit = el("div", "story-credit");
+    root.append(this.credit);
+    this.bigTitle = el("div", "story-bigtitle");
+    root.append(this.bigTitle);
+  }
+
+  /** Full-frame black, no transition (the opening titles cut out of it). */
+  setBlack(on: boolean): void {
+    this.black.classList.toggle("in", on);
+  }
+
+  /** A credit caption, bottom-left; null hides it. Each call restarts the pop-in. */
+  showCredit(text: string | null): void {
+    if (text === null) {
+      this.credit.classList.remove("in");
+      return;
+    }
+    this.credit.textContent = text;
+    this.credit.classList.remove("in");
+    // Reflow so the pop-in replays on a hard cut.
+    void this.credit.offsetWidth;
+    this.credit.classList.add("in");
+  }
+
+  /** The big centred title card over the live scene: name and tagline on cream, scaling in. */
+  showBigTitle(title: string, tagline: string): void {
+    this.bigTitle.replaceChildren(el("div", "big", title), el("div", "tag", tagline));
+    this.bigTitle.classList.remove("in");
+    void this.bigTitle.offsetWidth;
+    this.bigTitle.classList.add("in");
   }
 
   /** Advances story time and retires the lower third and caption when due. */

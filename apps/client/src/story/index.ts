@@ -325,6 +325,9 @@ export function startStory(host: StoryHost, episode: Episode = episodeFromUrl())
     everyoneToDesks,
     everyoneCheers,
     nameCard: (a) => cards.introduce(a, true),
+    blackout: (on) => cards.setBlack(on),
+    credit: (text) => cards.showCredit(text),
+    bigTitle: (title, tagline) => cards.showBigTitle(title, tagline),
     showDeliverable,
     showWordmark: () => wordmark.classList.add("in"),
     snapZoom: (t, factor, hold, elevation) => mocku.snapZoom(targetOf(t), factor, hold, elevation),
@@ -342,18 +345,23 @@ export function startStory(host: StoryHost, episode: Episode = episodeFromUrl())
     setCamera: host.setCamera,
   };
 
-  // ---- the beats: the episode's, plus the cards and the freeze ----
+  // ---- the beats: the episode's, plus the cards (unless it draws its own) and the freeze ----
+  const cardBeats: Beat[] = episode.noCards
+    ? []
+    : [
+        {
+          at: 0,
+          run: () => {
+            cards.showTitle(episode.title, episode.tagline);
+            audio.play("titlecard");
+          },
+        },
+        { at: TITLE_SECONDS, run: () => cards.hideTitle() },
+        { at: Math.max(TITLE_SECONDS + 1, duration - END_SECONDS), run: () => cards.showEnd(episode.title) },
+      ];
   const beats: Beat[] = [
     ...episode.beats(ctx),
-    {
-      at: 0,
-      run: () => {
-        cards.showTitle(episode.title, episode.tagline);
-        audio.play("titlecard");
-      },
-    },
-    { at: TITLE_SECONDS, run: () => cards.hideTitle() },
-    { at: Math.max(TITLE_SECONDS + 1, duration - END_SECONDS), run: () => cards.showEnd(episode.title) },
+    ...cardBeats,
     {
       at: duration,
       run: () => {

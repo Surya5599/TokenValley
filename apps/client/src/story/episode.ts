@@ -44,6 +44,8 @@ export interface Episode {
   durationSeconds: number;
   /** Name cards (lower thirds) on by default. The pilot keeps them off for clean voiceover takes. */
   nameCards: boolean;
+  /** Skips the generic cold-open title card and end card; the episode draws its own (the opening titles). */
+  noCards?: boolean;
   beats: (ctx: EpisodeContext) => Beat[];
 }
 
@@ -91,6 +93,12 @@ export interface EpisodeContext {
   everyoneCheers: () => void;
   /** A lower-third for an agent (on the first speech it is automatic). */
   nameCard: (a: Agent) => void;
+  /** Full-frame black (the opening titles start on it). */
+  blackout: (on: boolean) => void;
+  /** A credit caption, bottom-left, cream card with ink text; null hides it. */
+  credit: (text: string | null) => void;
+  /** The big centred title card over the live scene (the opening titles' last shot). */
+  bigTitle: (title: string, tagline: string) => void;
   /** The closing deliverable card and wordmark used by the pilot and shipping day. */
   showDeliverable: () => void;
   showWordmark: () => void;

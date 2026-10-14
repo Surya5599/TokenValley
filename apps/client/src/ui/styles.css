@@ -1830,6 +1830,92 @@ button.linkish:disabled {
   transform: translateX(-50%);
 }
 
+/* Opening titles: a hard black frame, credit captions and the big title card. No fades; the music does the cutting. */
+.story-black {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  background: #000;
+  display: none;
+  pointer-events: none;
+}
+
+.story-black.in {
+  display: block;
+}
+
+.story-credit {
+  position: absolute;
+  left: 28px;
+  bottom: 64px;
+  z-index: 27;
+  padding: 8px 18px 9px;
+  background: #f6efe0;
+  color: #1b1a22;
+  font-family: Georgia, "Times New Roman", "Iowan Old Style", serif;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  border-radius: 3px;
+  box-shadow:
+    0 2px 0 #cfc3a6,
+    0 10px 24px rgba(0, 0, 0, 0.35);
+  transform: translateY(4px) scale(0.97);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.story-credit.in {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.08s linear,
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.story-bigtitle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 61;
+  padding: 26px 56px 30px;
+  background: #f6efe0;
+  color: #1b1a22;
+  text-align: center;
+  font-family: Georgia, "Times New Roman", "Iowan Old Style", serif;
+  border-radius: 4px;
+  box-shadow:
+    0 3px 0 #cfc3a6,
+    0 24px 60px rgba(0, 0, 0, 0.45);
+  transform: translate(-50%, -50%) scale(0.86);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.story-bigtitle.in {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  transition:
+    opacity 0.1s linear,
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.story-bigtitle .big {
+  font-size: 84px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1;
+}
+
+.story-bigtitle .tag {
+  margin-top: 10px;
+  font-size: 24px;
+  font-style: italic;
+  letter-spacing: 0.04em;
+  color: #4a4756;
+}
+
 /* Episodes modal (Help menu). */
 .episodes {
   display: flex;
