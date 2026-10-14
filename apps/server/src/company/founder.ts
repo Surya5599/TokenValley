@@ -10,7 +10,7 @@ import {
   type ModelTier,
 } from "@agentsitcom/shared";
 import type { Town } from "../town.js";
-import { loadRole, loadRoster } from "../roles.js";
+import { loadCast, loadRole, loadRoster } from "../roles.js";
 import type { CompanyRegistry, CompanyRecord } from "./registry.js";
 
 const PALETTES: Company["palette"][] = [
@@ -77,6 +77,8 @@ export function foundCompany(town: Town, registry: CompanyRegistry, input: Found
     throw new Error(`Workspace folder does not exist: ${input.workspacePath}`);
   }
   const roster = loadRoster(input.rosterTemplate);
+  const cast = loadCast(input.cast);
+  if (input.cast && !cast) console.warn(`[agentsitcom] unknown cast "${input.cast}", using random names`);
   const base = slugHint ? slugify(slugHint) : slugify(input.name);
   let slug = base;
   const taken = new Set([...town.companies.values()].map((c) => c.slug));
@@ -94,6 +96,7 @@ export function foundCompany(town: Town, registry: CompanyRegistry, input: Found
     brief: input.brief,
     workspacePath,
     live: true,
+    cast: cast?.id ?? null,
     rosterTemplate: roster.name,
     palette: PALETTES[plot % PALETTES.length]!,
     budget: { maxTurns: input.maxTurns, maxTokens: input.maxTokens },
@@ -111,12 +114,15 @@ export function foundCompany(town: Town, registry: CompanyRegistry, input: Found
   for (const role of [...roster.core, ...roster.npcs]) {
     const def = loadRole(role);
     const isNpc = def.kind === "npc";
+    const member = cast?.cast[role];
+    const firstName = member?.name ?? NAMES[nameIdx++ % NAMES.length];
     const agent: Agent = {
       id: town.nextId("ag"),
       companyId: id,
       role,
       kind: isNpc ? "npc" : "core",
-      name: `${NAMES[nameIdx++ % NAMES.length]} (${ROLE_LABEL[role]})`,
+      name: `${firstName} (${ROLE_LABEL[role]})`,
+      title: member?.title ?? "",
       model: isNpc ? null : overrides[role] ?? def.model ?? DEFAULT_MODEL[role],
       effort: def.effort,
       status: "idle",

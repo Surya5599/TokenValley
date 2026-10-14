@@ -3,6 +3,7 @@ name: Pied Prompter
 tagline: Middle-out for your to-do list.
 workspace: ../../workspaces/pied-prompter
 roster: startup
+cast: the-office
 budget_turns: 60
 models:
   engineer: sonnet

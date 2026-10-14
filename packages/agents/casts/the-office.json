@@ -1,0 +1,22 @@
+{
+  "id": "the-office",
+  "show": "The Office (US)",
+  "company": { "name": "Dunder Mindflin", "tagline": "Limitless paper in a paperless world." },
+  "style": { "palette": "paper", "sign": "Dunder Mindflin" },
+  "cast": {
+    "ceo": { "name": "Michael", "title": "Regional Manager" },
+    "pm": { "name": "Jim", "title": "Sales, Reluctantly" },
+    "engineer": { "name": "Dwight", "title": "Assistant to the Regional Engineer" },
+    "qa": { "name": "Angela", "title": "Head of Accounting, Also Judgement" },
+    "designer": { "name": "Pam", "title": "Receptionist Turned Designer" },
+    "cfo": { "name": "Oscar", "title": "Accountant" },
+    "receptionist": { "name": "Erin", "title": "Receptionist" },
+    "intern": { "name": "Kevin", "title": "Intern, Allegedly" },
+    "it": { "name": "Creed", "title": "Quality Assurance, He Says" },
+    "marketing": { "name": "Ryan", "title": "Temp, Then VP, Then Temp" },
+    "hr": { "name": "Toby", "title": "Human Resources" },
+    "legal": { "name": "Stanley", "title": "Legal, Until 5 PM" },
+    "backend": { "name": "Darryl", "title": "Warehouse Foreman, Backend" },
+    "frontend": { "name": "Andy", "title": "Frontend, Cornell '95" }
+  }
+}

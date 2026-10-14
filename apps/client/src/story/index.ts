@@ -46,7 +46,7 @@ const nextId = (prefix: string) => `${prefix}-${++seq}`;
 
 function agent(id: string, role: RoleId, name: string, style = "", job = ""): Agent {
   const kind: Agent["kind"] = role === "cfo" || role === "receptionist" ? "npc" : ["ceo", "pm", "engineer", "qa", "designer"].includes(role) ? "core" : "hire";
-  return { id, companyId: COMPANY, role, kind, name, model: DEFAULT_MODEL[role], effort: "medium", status: "idle", currentTaskId: null, home: ROLE_HOME[role], parentAgentId: null, style, job };
+  return { id, companyId: COMPANY, role, kind, name, title: "", model: DEFAULT_MODEL[role], effort: "medium", status: "idle", currentTaskId: null, home: ROLE_HOME[role], parentAgentId: null, style, job };
 }
 
 function company(id: string, name: string, tagline: string, plot: number, palette: Company["palette"], live = false): Company {
@@ -58,6 +58,7 @@ function company(id: string, name: string, tagline: string, plot: number, palett
     brief: `${name} builds a landing page for AgentSitcom.`,
     workspacePath: "",
     live,
+    cast: null,
     rosterTemplate: "startup",
     palette,
     budget: { maxTurns: 200, maxTokens: 2_000_000 },

@@ -112,6 +112,8 @@ export const Company = z.object({
   workspacePath: z.string().default(""),
   /** True when real Claude Code agents run this company. */
   live: z.boolean().default(false),
+  /** Cast id, when the company is themed after a show. */
+  cast: z.string().nullable().default(null),
   rosterTemplate: z.string(),
   palette: Palette,
   budget: Budget,
@@ -130,6 +132,8 @@ export const Agent = z.object({
   kind: AgentKind,
   /** Display name, e.g. "Dana (CEO)". */
   name: z.string(),
+  /** Credit title from the cast, e.g. "Assistant to the Regional Engineer". */
+  title: z.string().default(""),
   model: ModelTier.nullable(),
   effort: Effort.default("medium"),
   status: AgentStatus,
@@ -278,6 +282,8 @@ export const FoundCompanyInput = z.object({
   /** Absolute path to the folder (or git checkout) this company is in charge of. */
   workspacePath: z.string().min(1),
   rosterTemplate: z.string().default("startup"),
+  /** A sitcom cast from packages/agents/casts/<id>.json; names and titles per role. */
+  cast: z.string().nullable().default(null),
   modelOverrides: z.record(ModelTier).default({}),
   maxTurns: z.number().int().positive().default(100),
   maxTokens: z.number().int().positive().default(5_000_000),

@@ -60,6 +60,7 @@ export function readCompanyFile(path: string): CompanyFile {
     brief: body || "No brief given. Ask the founder what to build.",
     workspacePath,
     rosterTemplate: str("roster") ?? "startup",
+    cast: str("cast") ?? null,
     modelOverrides,
     maxTurns: str("budget_turns") ? Number(str("budget_turns")) : 100,
     maxTokens: str("budget_tokens") ? Number(str("budget_tokens")) : 5_000_000,

@@ -18,6 +18,7 @@ name: Pied Prompter
 tagline: Middle-out for your to-do list.
 workspace: ../../workspaces/pied-prompter   # folder the company is in charge of (relative to this file, or absolute)
 roster: startup                              # startup | solo-founder | enterprise
+cast: the-office                             # optional: a sitcom cast from packages/agents/casts/
 budget_turns: 100                            # agent turns; one turn = one agent waking up and doing one thing
 budget_tokens: 5000000                       # input + output tokens, cache reads not counted
 models:
@@ -29,7 +30,10 @@ Build a to-do list web app. Plain HTML, CSS and JavaScript, no framework.
 Items persist in local storage. It should look tidy and work on a phone.
 ```
 
-Everything in the front matter except `name` and `workspace` is optional. The
+`cast` picks a sitcom ensemble: every role gets that show's character name
+and title, and the office draws the matching look. See
+`packages/agents/casts/README.md`. Everything in the front matter except
+`name` and `workspace` is optional. The
 body is the brief the CEO receives. If the workspace folder does not exist it
 is created.
 

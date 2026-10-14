@@ -124,6 +124,7 @@ export class FakeGenerator {
       brief: spec.brief,
       workspacePath: "",
       live: false,
+      cast: null,
       rosterTemplate: "startup",
       palette: spec.palette,
       budget: { maxTurns: 200, maxTokens: 2_000_000 },
@@ -141,6 +142,7 @@ export class FakeGenerator {
         role,
         kind: DEFAULT_MODEL[role] ? "core" : "npc",
         name: `${spec.names[role] ?? ROLE_LABEL[role]} (${ROLE_LABEL[role]})`,
+        title: "",
         model: DEFAULT_MODEL[role],
         effort: "medium",
         status: "idle",
@@ -287,7 +289,7 @@ export class FakeGenerator {
     }
     if (roll < 0.955 && (agent.role === "engineer" || agent.role === "backend" || agent.role === "frontend")) {
       const contractor: Agent = {
-        id: this.town.nextId("ctr"), companyId: cid, role: "intern", kind: "contractor", name: "Subagent", model: "haiku", effort: "low",
+        id: this.town.nextId("ctr"), companyId: cid, role: "intern", kind: "contractor", name: "Subagent", title: "", model: "haiku", effort: "low",
         status: "working", currentTaskId: mine?.id ?? null, home: agent.home, parentAgentId: agent.id, style: "", job: "",
       };
       this.town.emit({ ...this.base(cid), agentId: agent.id, type: "subagent_spawned", contractor });
@@ -305,7 +307,7 @@ export class FakeGenerator {
     }
     if (roll < 0.993 && (agent.role === "pm" || agent.role === "ceo")) {
       const hire: Agent = {
-        id: this.town.nextId("ag"), companyId: cid, role: pick(["intern", "marketing", "legal", "backend"] as const), kind: "hire", name: "", model: "haiku", effort: "low",
+        id: this.town.nextId("ag"), companyId: cid, role: pick(["intern", "marketing", "legal", "backend"] as const), kind: "hire", name: "", title: "", model: "haiku", effort: "low",
         status: "idle", currentTaskId: null, home: "floating_2", parentAgentId: null, style: "", job: "",
       };
       hire.name = `New hire (${ROLE_LABEL[hire.role]})`;

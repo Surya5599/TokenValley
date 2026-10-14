@@ -69,6 +69,31 @@ export function loadRole(role: RoleId): RoleDef {
 
 export type Persona = { name?: string; style: string; job: string };
 
+export type Cast = {
+  id: string;
+  show: string;
+  company?: { name: string; tagline?: string };
+  cast: Partial<Record<RoleId, { name: string; title?: string }>>;
+};
+
+/** A sitcom cast from packages/agents/casts/<id>.json, or null when unknown. */
+export function loadCast(id: string | null | undefined): Cast | null {
+  if (!id) return null;
+  const file = join(AGENTS_DIR, "casts", `${id}.json`);
+  if (!existsSync(file)) return null;
+  try {
+    return JSON.parse(readFileSync(file, "utf8")) as Cast;
+  } catch {
+    return null;
+  }
+}
+
+export function listCasts(): string[] {
+  const dir = join(AGENTS_DIR, "casts");
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).filter((f) => f.endsWith(".json")).map((f) => f.replace(/\.json$/, ""));
+}
+
 function personaFile(companySlug: string, role: RoleId): string {
   return join(REPO_ROOT, "companies", companySlug, "agents", `${role}.md`);
 }

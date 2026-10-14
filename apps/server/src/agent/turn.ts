@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { ROLE_LABEL, type Agent, type Company, type Event, type RoleId, type Spend, type Task } from "@agentsitcom/shared";
 import type { Town } from "../town.js";
-import { loadPersona, loadRole, REPO_ROOT } from "../roles.js";
+import { loadCast, loadPersona, loadRole, REPO_ROOT } from "../roles.js";
 import { ClaudeRunner } from "./claude-runner.js";
 import type { CompanyRecord, CompanyRegistry } from "../company/registry.js";
 
@@ -158,8 +158,9 @@ function translate(opts: TurnOptions, name: string, input: Record<string, unknow
         // Phase 3 spawns a real hire. For now the hire is recorded as an idle agent so the office shows them arriving.
         const role = str("role") as RoleId;
         const def = loadRole(role);
+        const member = loadCast(record.company.cast)?.cast[role];
         const hire: Agent = {
-          id: town.nextId("ag"), companyId: cid, role, kind: "hire", name: `New hire (${ROLE_LABEL[role]})`,
+          id: town.nextId("ag"), companyId: cid, role, kind: "hire", name: `${member?.name ?? "New hire"} (${ROLE_LABEL[role]})`, title: member?.title ?? "",
           model: (input.model as Agent["model"]) ?? def.model, effort: def.effort, status: "idle", currentTaskId: null, home: def.home, parentAgentId: null,
           style: def.style, job: def.job,
         };
@@ -191,7 +192,7 @@ function translate(opts: TurnOptions, name: string, input: Record<string, unknow
       break;
     case "Task": case "Agent": {
       const contractor: Agent = {
-        id: town.nextId("ctr"), companyId: cid, role: "intern", kind: "contractor", name: "Subagent", model: null, effort: "low",
+        id: town.nextId("ctr"), companyId: cid, role: "intern", kind: "contractor", name: "Subagent", title: "", model: null, effort: "low",
         status: "working", currentTaskId: agent.currentTaskId, home: agent.home, parentAgentId: agent.id, style: "", job: "",
       };
       town.emit({ ...ev(town, cid), type: "subagent_spawned", agentId: agent.id, contractor });
