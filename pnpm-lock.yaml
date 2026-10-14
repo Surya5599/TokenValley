@@ -10,7 +10,7 @@ importers:
 
   apps/client:
     dependencies:
-      '@tokenvalley/shared':
+      '@agentsitcom/shared':
         specifier: workspace:*
         version: link:../../packages/shared
       postprocessing:
@@ -35,12 +35,12 @@ importers:
 
   apps/server:
     dependencies:
+      '@agentsitcom/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       '@modelcontextprotocol/sdk':
         specifier: ^1.12.0
         version: 1.32.1(zod@3.25.76)
-      '@tokenvalley/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
       ws:
         specifier: ^8.18.0
         version: 8.22.0

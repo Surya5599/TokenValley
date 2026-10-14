@@ -40,25 +40,25 @@ runner.on("line", (l) => {
 
 const started = Date.now();
 const result = await runner.run({
-  model: process.env.TOKENVALLEY_SPIKE_MODEL ?? "haiku",
+  model: process.env.AGENTSITCOM_SPIKE_MODEL ?? "haiku",
   maxTurns: 6,
   cwd: repoRoot,
   tempDir: dataDir,
-  allowedTools: ["mcp__tokenvalley__send_message", "mcp__tokenvalley__create_task"],
+  allowedTools: ["mcp__agentsitcom__send_message", "mcp__agentsitcom__create_task"],
   systemPrompt: [
-    "You are the Product Manager at Pied Prompter, a company in TokenValley.",
+    "You are the Product Manager at Pied Prompter, a company in AgentSitcom.",
     "Style: you schedule a meeting for everything, but keep it to one short line.",
     "Job: you own the task board. Use ONLY the tools provided. Do not read or write files.",
   ].join("\n"),
   prompt: "Spike check: send the CEO a one-line message saying the board is ready, then create one task titled 'Write product spec' owned by pm. Then stop.",
   mcpServers: {
-    tokenvalley: {
+    agentsitcom: {
       command: tsxBin,
       args: ["tsx", mcpServerEntry],
       env: {
-        TOKENVALLEY_COMPANY: "pied-prompter",
-        TOKENVALLEY_AGENT: "pm",
-        TOKENVALLEY_TOOL_LOG: join(dataDir, "spike-tools.jsonl"),
+        AGENTSITCOM_COMPANY: "pied-prompter",
+        AGENTSITCOM_AGENT: "pm",
+        AGENTSITCOM_TOOL_LOG: join(dataDir, "spike-tools.jsonl"),
       },
     },
   },

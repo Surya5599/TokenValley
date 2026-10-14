@@ -1,5 +1,5 @@
 import { WebSocketServer, type WebSocket } from "ws";
-import { ClientMessage, type Approval, type Event, type FoundCompanyInput } from "@tokenvalley/shared";
+import { ClientMessage, type Approval, type Event, type FoundCompanyInput } from "@agentsitcom/shared";
 import { join } from "node:path";
 import { Town } from "./town.js";
 import { FakeGenerator } from "./fake/generator.js";
@@ -11,9 +11,9 @@ import { Scheduler } from "./scheduler.js";
 import { REPO_ROOT, savePersona } from "./roles.js";
 import { mkdirSync, writeFileSync, existsSync } from "node:fs";
 
-const PORT = Number(process.env.TOKENVALLEY_PORT ?? 8787);
+const PORT = Number(process.env.AGENTSITCOM_PORT ?? 8787);
 /** "fake" adds three demo companies driven by templates. "live" shows only real companies. */
-const MODE = process.env.TOKENVALLEY_MODE ?? "fake";
+const MODE = process.env.AGENTSITCOM_MODE ?? "fake";
 
 const town = new Town();
 const registry = new CompanyRegistry(join(REPO_ROOT, "data"));
@@ -34,7 +34,7 @@ for (const rec of registry.list()) {
   town.events.push(...rec.events.slice(-200));
   if (!town.focusedCompanyId) town.focusedCompanyId = rec.company.id;
 }
-if (records.size) console.log(`[tokenvalley] restored ${records.size} live compan${records.size === 1 ? "y" : "ies"}`);
+if (records.size) console.log(`[agentsitcom] restored ${records.size} live compan${records.size === 1 ? "y" : "ies"}`);
 
 const ev = (companyId: string) => ({ id: town.nextId("ev"), companyId, timestamp: Date.now() });
 
@@ -126,7 +126,7 @@ async function kickoff(rec: CompanyRecord): Promise<void> {
     });
     town.emit({ ...ev(rec.company.id), type: "company_phase", phase: "building" });
   } catch (err) {
-    console.error(`[tokenvalley] CEO kickoff failed for ${rec.company.slug}:`, err);
+    console.error(`[agentsitcom] CEO kickoff failed for ${rec.company.slug}:`, err);
   }
 }
 
@@ -219,7 +219,7 @@ wss.on("connection", (ws: WebSocket) => {
         try {
           updateCompanyFileBudget(rec.company.slug, msg.maxTurns, msg.maxTokens);
         } catch (err) {
-          console.warn(`[tokenvalley] could not write budget to company.md for ${rec.company.slug}:`, err instanceof Error ? err.message : err);
+          console.warn(`[agentsitcom] could not write budget to company.md for ${rec.company.slug}:`, err instanceof Error ? err.message : err);
         }
         break;
       }
@@ -258,7 +258,7 @@ wss.on("connection", (ws: WebSocket) => {
           scheduler.pause(rec.company.id);
           town.emit({ ...ev(rec.company.id), type: "company_phase", phase: "paused" });
         }
-        console.log("[tokenvalley] PANIC: all companies paused");
+        console.log("[agentsitcom] PANIC: all companies paused");
         break;
     }
   });
@@ -268,7 +268,7 @@ wss.on("connection", (ws: WebSocket) => {
 
 if (MODE === "fake") {
   new FakeGenerator(town).start();
-  console.log(`[tokenvalley] fake companies running (set TOKENVALLEY_MODE=live to hide them)`);
+  console.log(`[agentsitcom] fake companies running (set AGENTSITCOM_MODE=live to hide them)`);
 }
 
 // Found companies from companies/<slug>/company.md, now and whenever one appears.
@@ -285,18 +285,18 @@ watchCompanyFiles((file) => {
         scheduler.resume(rec.company.id);
       }
       registry.save(rec);
-      console.log(`[tokenvalley] ${file.input.name}: budget updated to ${file.input.maxTurns} turns`);
+      console.log(`[agentsitcom] ${file.input.name}: budget updated to ${file.input.maxTurns} turns`);
     }
     return;
   }
   known.add(file.slug);
   try {
     found(file.input, file.slug);
-    console.log(`[tokenvalley] founded ${file.input.name} from ${file.path}`);
+    console.log(`[agentsitcom] founded ${file.input.name} from ${file.path}`);
   } catch (err) {
-    console.error(`[tokenvalley] could not found ${file.slug}:`, err instanceof Error ? err.message : err);
+    console.error(`[agentsitcom] could not found ${file.slug}:`, err instanceof Error ? err.message : err);
   }
 });
 
 scheduler.start();
-console.log(`[tokenvalley] server listening on ws://localhost:${PORT} (mode=${MODE}, pool=${town.poolSize})`);
+console.log(`[agentsitcom] server listening on ws://localhost:${PORT} (mode=${MODE}, pool=${town.poolSize})`);

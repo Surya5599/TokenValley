@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { DEFAULT_MODEL, HOME_SPOTS, ROLE_HOME, type Agent, type Approval, type Company, type Event, type RoleId, type ServerMessage, type Task } from "@tokenvalley/shared";
+import { DEFAULT_MODEL, HOME_SPOTS, ROLE_HOME, type Agent, type Approval, type Company, type Event, type RoleId, type ServerMessage, type Task } from "@agentsitcom/shared";
 import { createCueRecorder, type CueRecord, type SfxName, type SfxParams } from "../audio/engine";
 import { Store, type CameraMode } from "../state/store";
 import { spotTile, tileToWorld, type Tile } from "../world/office";
@@ -55,7 +55,7 @@ function company(id: string, name: string, tagline: string, plot: number, palett
     slug: id,
     name,
     tagline,
-    brief: `${name} builds a landing page for TokenValley.`,
+    brief: `${name} builds a landing page for AgentSitcom.`,
     workspacePath: "",
     live,
     rosterTemplate: "startup",
@@ -177,7 +177,7 @@ export function startStory(host: StoryHost, episode: Episode = episodeFromUrl())
     card.replaceChildren();
     const title = document.createElement("div");
     title.className = "title";
-    title.textContent = "Shipped: TokenValley landing page";
+    title.textContent = "Shipped: AgentSitcom landing page";
     card.append(title);
     if (deliverableReachable !== false) {
       const frame = document.createElement("iframe");
@@ -191,7 +191,7 @@ export function startStory(host: StoryHost, episode: Episode = episodeFromUrl())
       placeholder.className = "placeholder";
       const line1 = document.createElement("div");
       line1.className = "big";
-      line1.textContent = "TokenValley";
+      line1.textContent = "AgentSitcom";
       const line2 = document.createElement("div");
       line2.textContent = "Pastel. Three feature cards. Works on a phone.";
       placeholder.append(line1, line2);
@@ -208,7 +208,7 @@ export function startStory(host: StoryHost, episode: Episode = episodeFromUrl())
 
   const wordmark = document.createElement("div");
   wordmark.className = "story-wordmark";
-  wordmark.textContent = "TokenValley";
+  wordmark.textContent = "AgentSitcom";
   host.overlayRoot.append(wordmark);
 
   // ---- crowd helpers ----

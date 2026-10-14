@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { FoundCompanyInput, ServerMessage } from "@tokenvalley/shared";
+import type { FoundCompanyInput, ServerMessage } from "@agentsitcom/shared";
 import { createAudio } from "./audio/engine";
 import { encodeWav, measure, normalizePeak, renderCues, toBase64 } from "./audio/render";
 import { startDemo } from "./demo";
@@ -534,7 +534,7 @@ function bootstrap(): void {
   };
 
   // Debug hook for driving the client from the console or scripts.
-  (window as unknown as { tokenvalley: unknown }).tokenvalley = { store, rig, director, valley, overlay, renderer, fx, setCamera, focusCompany, handleMessage, story, audio, exportAudio, captureCues, renderCues, measure };
+  (window as unknown as { agentsitcom: unknown }).agentsitcom = { store, rig, director, valley, overlay, renderer, fx, setCamera, focusCompany, handleMessage, story, audio, exportAudio, captureCues, renderCues, measure };
 }
 
 bootstrap();

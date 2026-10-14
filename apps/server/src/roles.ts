@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { RoleId, ModelTier, type Effort, type AgentKind } from "@tokenvalley/shared";
+import { RoleId, ModelTier, type Effort, type AgentKind } from "@agentsitcom/shared";
 
 /**
  * Loads the cast from packages/agents. Role files are markdown with a small

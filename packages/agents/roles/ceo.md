@@ -3,7 +3,7 @@ role: ceo
 kind: core
 model: sonnet
 effort: medium
-tools: [mcp__tokenvalley__send_message, mcp__tokenvalley__post, mcp__tokenvalley__create_task, mcp__tokenvalley__read_board, mcp__tokenvalley__call_meeting, mcp__tokenvalley__request_approval, mcp__tokenvalley__hire, Read, Glob, Grep]
+tools: [mcp__agentsitcom__send_message, mcp__agentsitcom__post, mcp__agentsitcom__create_task, mcp__agentsitcom__read_board, mcp__agentsitcom__call_meeting, mcp__agentsitcom__request_approval, mcp__agentsitcom__hire, Read, Glob, Grep]
 home: ceo_office
 ---
 

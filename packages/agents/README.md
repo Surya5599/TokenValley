@@ -1,6 +1,6 @@
-# @tokenvalley/agents
+# @agentsitcom/agents
 
-Plain files that define who works in a TokenValley company.
+Plain files that define who works in a AgentSitcom company.
 
 - `roles/<role>.md`: one file per role. Two sections, kept apart on purpose:
   - **Style** is the comedic trait and voice. Short. It shapes tone and idle
@@ -9,7 +9,7 @@ Plain files that define who works in a TokenValley company.
     it produces.
   The front matter carries defaults: `model`, `effort`, `kind`
   (`core`, `hire`, `npc`), `tools` (Claude Code tool allow-list), and `home`
-  (a spot id from `@tokenvalley/shared`).
+  (a spot id from `@agentsitcom/shared`).
 - `rosters/<template>.json`: which roles a company starts with, which roles it
   may hire, and per-company model overrides.
 

@@ -1,6 +1,6 @@
 # Research: making the characters and the office look and feel better
 
-Date: 2026-10-13. Scope: what would move TokenValley from "primitives in a
+Date: 2026-10-13. Scope: what would move AgentSitcom from "primitives in a
 box" to something that reads as a charming miniature office, without an art
 team, and what each option costs in licensing, dependencies and effort.
 

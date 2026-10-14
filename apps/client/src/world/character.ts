@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import type { Agent, AnimState, ModelTier, RoleId } from "@tokenvalley/shared";
+import type { Agent, AnimState, ModelTier, RoleId } from "@agentsitcom/shared";
 import { Face, type Expression, type SmileBase } from "./faces";
 import { spotTile, tileToWorld, type Office, type Tile } from "./office";
 import { findPath, nearestWalkable } from "./pathfinding";

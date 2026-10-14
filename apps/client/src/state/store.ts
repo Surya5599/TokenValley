@@ -1,4 +1,4 @@
-import type { Agent, Approval, ChatPost, Company, Event, ServerMessage, Task } from "@tokenvalley/shared";
+import type { Agent, Approval, ChatPost, Company, Event, ServerMessage, Task } from "@agentsitcom/shared";
 import type { ConnStatus } from "../net/ws";
 
 /** Derived building status shown on the valley map. */

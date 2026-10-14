@@ -24,7 +24,7 @@ logs/
 .env
 .env.*
 !.env.example
-tokenvalley.local.json
+agentsitcom.local.json
 .claude/settings.local.json
 .mcp.local.json
 

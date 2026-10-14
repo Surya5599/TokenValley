@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Agent, Company, Event, Message, Task } from "@tokenvalley/shared";
+import type { Agent, Company, Event, Message, Task } from "@agentsitcom/shared";
 
 /**
  * Persists founded (live) companies between server restarts as plain JSON

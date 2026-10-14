@@ -1,4 +1,4 @@
-import { ServerMessage, type ClientMessage } from "@tokenvalley/shared";
+import { ServerMessage, type ClientMessage } from "@agentsitcom/shared";
 
 export type ConnStatus = "connecting" | "connected" | "disconnected";
 

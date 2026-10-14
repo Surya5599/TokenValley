@@ -3,7 +3,7 @@ import { createInterface } from "node:readline";
 import { EventEmitter } from "node:events";
 import { mkdirSync, writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
-import type { ModelTier } from "@tokenvalley/shared";
+import type { ModelTier } from "@agentsitcom/shared";
 
 /**
  * Runs one agent turn as a child process of the unmodified `claude` binary in
@@ -78,7 +78,7 @@ export class ClaudeRunner extends EventEmitter<RunnerEvents> {
   private child: ChildProcess | null = null;
 
   async run(opts: RunnerOptions): Promise<RunResult> {
-    const bin = opts.claudeBinary ?? process.env.TOKENVALLEY_CLAUDE_BIN ?? "claude";
+    const bin = opts.claudeBinary ?? process.env.AGENTSITCOM_CLAUDE_BIN ?? "claude";
     const args = [
       "-p",
       "--verbose",
@@ -107,7 +107,7 @@ export class ClaudeRunner extends EventEmitter<RunnerEvents> {
       stdio: ["ignore", "pipe", "pipe"],
       // No shell: arguments contain prompts with quotes and newlines. On Windows,
       // CreateProcess resolves `claude` to `claude.exe` on PATH by itself. If your
-      // install is a .cmd shim, point TOKENVALLEY_CLAUDE_BIN at the real executable.
+      // install is a .cmd shim, point AGENTSITCOM_CLAUDE_BIN at the real executable.
       shell: false,
       env: { ...process.env },
     });

@@ -9,16 +9,16 @@ import { appendFileSync, existsSync, readFileSync } from "node:fs";
  * never address another company: there is no parameter for it.
  *
  * Phase 0/1: tools validate input, log the call to a JSONL file (if
- * TOKENVALLEY_TOOL_LOG is set), and return a short acknowledgement. The
+ * AGENTSITCOM_TOOL_LOG is set), and return a short acknowledgement. The
  * orchestrator also observes every tool_use in the stream-json output, so the
  * canonical event source is the stream, not this file.
  * Phase 2: these handlers talk to the company's task board and message log.
  */
 
-const COMPANY = process.env.TOKENVALLEY_COMPANY ?? "unknown-company";
-const AGENT = process.env.TOKENVALLEY_AGENT ?? "unknown-agent";
-const LOG = process.env.TOKENVALLEY_TOOL_LOG;
-const BOARD_FILE = process.env.TOKENVALLEY_BOARD_FILE;
+const COMPANY = process.env.AGENTSITCOM_COMPANY ?? "unknown-company";
+const AGENT = process.env.AGENTSITCOM_AGENT ?? "unknown-agent";
+const LOG = process.env.AGENTSITCOM_TOOL_LOG;
+const BOARD_FILE = process.env.AGENTSITCOM_BOARD_FILE;
 
 function record(tool: string, input: unknown): void {
   if (!LOG) return;
@@ -27,7 +27,7 @@ function record(tool: string, input: unknown): void {
 
 const ok = (text: string) => ({ content: [{ type: "text" as const, text }] });
 
-const server = new McpServer({ name: "tokenvalley", version: "0.1.0" });
+const server = new McpServer({ name: "agentsitcom", version: "0.1.0" });
 
 server.tool(
   "send_message",

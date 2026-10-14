@@ -1,4 +1,4 @@
-import { DEFAULT_MODEL, ROLE_HOME, type Agent, type Company, type Event, type RoleId, type ServerMessage, type Task } from "@tokenvalley/shared";
+import { DEFAULT_MODEL, ROLE_HOME, type Agent, type Company, type Event, type RoleId, type ServerMessage, type Task } from "@agentsitcom/shared";
 
 /**
  * Standalone demo (?demo=1): a synthetic snapshot with two companies and a

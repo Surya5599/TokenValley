@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { OFFICE_DEPTH, OFFICE_WIDTH, type AnimState } from "@tokenvalley/shared";
+import { OFFICE_DEPTH, OFFICE_WIDTH, type AnimState } from "@agentsitcom/shared";
 import { spotTile, tileToWorld, type Tile } from "../../world/office";
 import { nearestWalkable } from "../../world/pathfinding";
 import type { Episode, EpisodeContext } from "../episode";
@@ -137,7 +137,7 @@ export const intro: Episode = {
           const p = building().add(new THREE.Vector3(0, 1.5, 0));
           cut(p, 115, 0.72, 0.55);
           rig.cinematicTo(p, 72, 0.62, 0.55, 1.0, "linear");
-          ctx.credit("TOKENVALLEY");
+          ctx.credit("AGENTSITCOM");
           ctx.cue("tick");
         },
       },
@@ -279,7 +279,7 @@ export const intro: Episode = {
           ctx.expression(cast.pam, "smile");
           ctx.expression(cast.erin, "big_smile");
           director.office?.printer.jam(2);
-          ctx.bigTitle("TokenValley", "The Office: Agent Edition");
+          ctx.bigTitle("AgentSitcom", "The Office: Agent Edition");
           ctx.cue("titlecard");
           ctx.cue("boing");
         },

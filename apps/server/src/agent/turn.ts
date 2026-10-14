@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { ROLE_LABEL, type Agent, type Company, type Event, type RoleId, type Spend, type Task } from "@tokenvalley/shared";
+import { ROLE_LABEL, type Agent, type Company, type Event, type RoleId, type Spend, type Task } from "@agentsitcom/shared";
 import type { Town } from "../town.js";
 import { loadPersona, loadRole, REPO_ROOT } from "../roles.js";
 import { ClaudeRunner } from "./claude-runner.js";
@@ -41,7 +41,7 @@ function systemPrompt(company: Company, agent: Agent, record: CompanyRecord): st
     ? record.tasks.map((t) => `- [${t.status}] ${t.id} ${t.title} (owner: ${t.ownerRole ?? "none"})`).join("\n")
     : "- (empty)";
   return [
-    `You are the ${ROLE_LABEL[agent.role]} at ${company.name}, a company in TokenValley.`,
+    `You are the ${ROLE_LABEL[agent.role]} at ${company.name}, a company in AgentSitcom.`,
     `Your name is ${agent.name}. The company is in charge of the project folder at: ${company.workspacePath}`,
     ``,
     `## Company brief`,
@@ -65,7 +65,7 @@ function systemPrompt(company: Company, agent: Agent, record: CompanyRecord): st
     ...record.channels.filter((c) => c.memberIds.includes(agent.id) && c.open).map((c) => `- #${c.channel}: ${c.title} (${c.memberIds.length} people). Post there to take part.`),
     ``,
     `## Rules`,
-    `- Use the tokenvalley tools to talk to colleagues and manage tasks. Keep messages short.`,
+    `- Use the agentsitcom tools to talk to colleagues and manage tasks. Keep messages short.`,
     `- send_message is private, post is public. Prefer post when more than one person should hear it. Stay in character; disagree out loud when you disagree.`,
     `- Stay inside the project folder. Never reference other companies; there are none you know of.`,
     `- Budget: ${company.spend.turns}/${company.budget.maxTurns} turns used. Be economical.`,
@@ -78,8 +78,8 @@ function translate(opts: TurnOptions, name: string, input: Record<string, unknow
   const cid = record.company.id;
   const str = (k: string) => (typeof input[k] === "string" ? (input[k] as string) : "");
 
-  if (name.startsWith("mcp__tokenvalley__")) {
-    const tool = name.slice("mcp__tokenvalley__".length);
+  if (name.startsWith("mcp__agentsitcom__")) {
+    const tool = name.slice("mcp__agentsitcom__".length);
     switch (tool) {
       case "send_message": {
         const toRole = str("to").toLowerCase();
@@ -232,14 +232,14 @@ export async function runAgentTurn(opts: TurnOptions): Promise<void> {
     prompt: opts.prompt,
     resumeSessionId: record.sessions[agent.id],
     mcpServers: {
-      tokenvalley: {
+      agentsitcom: {
         command: NPX,
         args: ["tsx", MCP_ENTRY],
         env: {
-          TOKENVALLEY_COMPANY: company.slug,
-          TOKENVALLEY_AGENT: agent.role,
-          TOKENVALLEY_TOOL_LOG: join(dataDir, `tools-${company.slug}.jsonl`),
-          TOKENVALLEY_BOARD_FILE: registry.fileFor(company.slug),
+          AGENTSITCOM_COMPANY: company.slug,
+          AGENTSITCOM_AGENT: agent.role,
+          AGENTSITCOM_TOOL_LOG: join(dataDir, `tools-${company.slug}.jsonl`),
+          AGENTSITCOM_BOARD_FILE: registry.fileFor(company.slug),
         },
       },
     },

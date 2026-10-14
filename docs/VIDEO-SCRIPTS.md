@@ -1,12 +1,12 @@
-# Voiceover scripts for the TokenValley episodes
+# Voiceover scripts for the AgentSitcom episodes
 
 Each episode is recorded silently from `?demo=story&ep=<id>`. Read the lines
 over the video; the timestamps are where each beat starts on screen. Lines are
 short on purpose, spoken at a normal pace they fit with room to breathe. Say
 what is on screen a beat after it appears, not before.
 
-Files: `exports/tokenvalley-<episode>-16x9.mp4` (YouTube, 1920x1080) and
-`exports/tokenvalley-<episode>-9x16.mp4` (Reels and Shorts, 1080x1920, side
+Files: `exports/agentsitcom-<episode>-16x9.mp4` (YouTube, 1920x1080) and
+`exports/agentsitcom-<episode>-9x16.mp4` (Reels and Shorts, 1080x1920, side
 panel hidden).
 
 Pick a licensed track from the platform's own music library when you post.
@@ -35,7 +35,7 @@ Hook in the first three seconds. This is the main reel.
 | 1:38 | Michael at the bell, approval dialog | When it's done, Michael comes to me for sign-off. I'm the only approval. |
 | 1:46 | Approve, everyone celebrates | I click ship. |
 | 1:55 | Deliverable card slides in | And this is the actual page they built. Not a mockup. The real thing. |
-| 2:04 | Wordmark fade | It's called TokenValley. It's open source, link in the bio. |
+| 2:04 | Wordmark fade | It's called AgentSitcom. It's open source, link in the bio. |
 
 ---
 
@@ -53,7 +53,7 @@ Hook in the first three seconds. This is the main reel.
 | 0:58 | Talking head: Pam | Pam, to camera: "I had a fourth pink." |
 | 1:08 | Michael picks the first pink | Michael picks the first pink. The one from the start. |
 | 1:16 | Pam writes tokens.json anyway | Pam writes the colour file anyway. The work gets done. That's the point. |
-| 1:22 | End card | These are real AI agents with real personalities, doing real work. TokenValley. |
+| 1:22 | End card | These are real AI agents with real personalities, doing real work. AgentSitcom. |
 
 ---
 
@@ -69,7 +69,7 @@ Hook in the first three seconds. This is the main reel.
 | 0:42 | Dwight fixes, build passes | Dwight actually fixes it. Build goes green. Angela approves. |
 | 0:52 | Angela files a second bug | And files a second bug. |
 | 0:58 | Talking head: Angela | "I keep a list." |
-| 1:06 | Jar with two bugs, end card | Every bug is a real ticket on a real board. TokenValley, link in bio. |
+| 1:06 | Jar with two bugs, end card | Every bug is a real ticket on a real board. AgentSitcom, link in bio. |
 
 ---
 
@@ -88,7 +88,7 @@ Hook in the first three seconds. This is the main reel.
 | 0:56 | Resume, everyone jolts back | Resume. They're back. |
 | 1:04 | Kevin spills chili | Kevin brought chili. |
 | 1:12 | Talking head: Michael | "That's not a panic. That's a brand." |
-| 1:24 | End card | Hard caps, pause, and a panic button. You stay in control. TokenValley. |
+| 1:24 | End card | Hard caps, pause, and a panic button. You stay in control. AgentSitcom. |
 
 ---
 
@@ -104,7 +104,7 @@ Hook in the first three seconds. This is the main reel.
 | 0:50 | Approve | Ship it. |
 | 0:54 | Everyone waves, then cheers | They wave. They cheer. Erin rings the bell again for no reason. |
 | 1:05 | Deliverable card | And here's the site. Built, tested, and shipped by a cartoon office. |
-| 1:18 | End card | TokenValley. Open source. Link in bio. |
+| 1:18 | End card | AgentSitcom. Open source. Link in bio. |
 
 ---
 

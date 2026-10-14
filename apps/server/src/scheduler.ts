@@ -1,4 +1,4 @@
-import { ROLE_LABEL, type Agent, type Event, type Message, type Task } from "@tokenvalley/shared";
+import { ROLE_LABEL, type Agent, type Event, type Message, type Task } from "@agentsitcom/shared";
 import type { Town } from "./town.js";
 import type { CompanyRecord, CompanyRegistry } from "./company/registry.js";
 import { runAgentTurn } from "./agent/turn.js";
@@ -207,7 +207,7 @@ export class Scheduler {
     try {
       await runAgentTurn({ town: this.town, registry: this.registry, record: rec, agent, prompt, maxTurns: agent.role === "engineer" || agent.role === "backend" || agent.role === "frontend" ? 25 : 10 });
     } catch (err) {
-      console.error(`[tokenvalley] turn failed for ${rec.company.slug}/${ROLE_LABEL[agent.role]}:`, err instanceof Error ? err.message : err);
+      console.error(`[agentsitcom] turn failed for ${rec.company.slug}/${ROLE_LABEL[agent.role]}:`, err instanceof Error ? err.message : err);
     } finally {
       this.running.delete(agent.id);
       this.town.releaseSlot();

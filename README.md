@@ -1,4 +1,4 @@
-# TokenValley
+# AgentSitcom
 
 *The Office: Agent Edition.*
 
@@ -37,7 +37,7 @@ pnpm dev
 ```
 
 Open http://localhost:5173. Three fake companies run on templates so you can
-see the office move without spending anything. Set `TOKENVALLEY_MODE=live`
+see the office move without spending anything. Set `AGENTSITCOM_MODE=live`
 to hide them.
 
 ## Found a company

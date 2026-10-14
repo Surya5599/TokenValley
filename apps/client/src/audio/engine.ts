@@ -1,5 +1,5 @@
 /**
- * The TokenValley sound engine. Synthesized sound effects for office events
+ * The AgentSitcom sound engine. Synthesized sound effects for office events
  * and an optional gentle music loop, all over the Web Audio API with no
  * assets. The AudioContext is created lazily on the first user gesture
  * (autoplay policy) via `resume()`.
@@ -8,7 +8,7 @@
  * (`CueGate`) are pure so the live engine and the offline episode export
  * (`createCueRecorder`) make exactly the same decisions.
  */
-import type { Event } from "@tokenvalley/shared";
+import type { Event } from "@agentsitcom/shared";
 import { MusicLoop } from "./music";
 import { playSfx, SFX_MIN_GAP, type SfxName, type SfxParams } from "./sfx";
 import { buildGraph, type Graph } from "./synth";
@@ -47,8 +47,8 @@ export interface AudioOptions {
   onChange?: () => void;
 }
 
-const KEY_SFX = "tokenvalley.audio.sfx";
-const KEY_MUSIC = "tokenvalley.audio.music";
+const KEY_SFX = "agentsitcom.audio.sfx";
+const KEY_MUSIC = "agentsitcom.audio.music";
 
 /** Base pitch of the speech bleeps per role: bosses and builders low, pm/designer high. */
 export const ROLE_PITCH: Record<string, number> = {

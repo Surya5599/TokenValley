@@ -1,4 +1,4 @@
-# TokenValley: Build Plan
+# AgentSitcom: Build Plan
 
 *The Office: Agent Edition.* A low-poly 3D valley of AI companies, each staffed
 by real Claude Code agents, that build your projects while you watch them walk
@@ -269,7 +269,7 @@ one motivational poster per role.
 ## Repo structure
 
 ```
-tokenvalley/
+agentsitcom/
   apps/
     client/          Vite + Three.js + TypeScript (valley, office, overlay)
     server/          Node + TypeScript (town, companies, agent runner, MCP tools, WebSocket)

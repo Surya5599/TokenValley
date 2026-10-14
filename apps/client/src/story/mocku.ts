@@ -4,7 +4,7 @@ import type { CameraRig } from "../world/camera";
 import type { Character, Expression } from "../world/character";
 import type { Director } from "../world/director";
 import { spotTile, tileToWorld, type Tile } from "../world/office";
-import type { AnimState } from "@tokenvalley/shared";
+import type { AnimState } from "@agentsitcom/shared";
 
 /**
  * The mockumentary camera: handheld sway, snap zooms, whip pans, slow push-ins

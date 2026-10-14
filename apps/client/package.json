@@ -1,5 +1,5 @@
 {
-  "name": "@tokenvalley/client",
+  "name": "@agentsitcom/client",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@tokenvalley/shared": "workspace:*",
+    "@agentsitcom/shared": "workspace:*",
     "postprocessing": "^6.39.5",
     "three": "^0.169.0",
     "zod": "^3.23.8"

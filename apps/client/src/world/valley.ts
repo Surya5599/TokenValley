@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import type { Company } from "@tokenvalley/shared";
+import type { Company } from "@agentsitcom/shared";
 import type { CompanyStatus, Store } from "../state/store";
 import { PASTEL, STOREY, facadeBoxGeometry, hex, pastel, place, tint, toonMat, windowTexture } from "./style";
 import { disposeSprite, textSprite } from "./textures";

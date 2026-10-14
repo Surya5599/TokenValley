@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { HOME_SPOTS, ROLE_HOME, type Agent, type AgentStatus, type AnimState, type Event, type RoleId } from "@tokenvalley/shared";
+import { HOME_SPOTS, ROLE_HOME, type Agent, type AgentStatus, type AnimState, type Event, type RoleId } from "@agentsitcom/shared";
 import { FOUNDER_ID, type Store } from "../state/store";
 import { Character, type Expression } from "./character";
 import { Office, spotTile, type Tile } from "./office";

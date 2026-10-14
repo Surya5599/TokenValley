@@ -1,4 +1,4 @@
-import { FoundCompanyInput, ROLE_LABEL, type Company, type CompanyPhase, type Event, type ModelTier, type RoleId, type TaskStatus } from "@tokenvalley/shared";
+import { FoundCompanyInput, ROLE_LABEL, type Company, type CompanyPhase, type Event, type ModelTier, type RoleId, type TaskStatus } from "@agentsitcom/shared";
 import { CHANNEL_FOUNDER, CHANNEL_GENERAL, FOUNDER_ID, type CameraMode, type ChatLine, type CompanyStatus, type PanelTab, type Store } from "../state/store";
 import { EPISODES } from "../story/episodes";
 import { ROLE_COLOR } from "../world/character";
@@ -306,7 +306,7 @@ export class Overlay {
   ) {
     this.root = root;
     const top = el("div", "topbar");
-    top.append(el("div", "brand", "TokenValley"));
+    top.append(el("div", "brand", "AgentSitcom"));
     this.menus = el("div", "menus");
     this.menus.setAttribute("role", "menubar");
     for (const m of MENU_IDS) {
@@ -805,7 +805,7 @@ export class Overlay {
       },
       { label: "Episodes…", title: "Scripted mockumentary episodes for recording", onSelect: () => this.openEpisodes() },
       { divider: true },
-      { label: "About TokenValley", onSelect: () => this.openAbout() },
+      { label: "About AgentSitcom", onSelect: () => this.openAbout() },
     ];
   }
 
@@ -932,16 +932,16 @@ export class Overlay {
   }
 
   private openAbout(): void {
-    this.infoBody.replaceChildren(el("h2", "", "About TokenValley"));
+    this.infoBody.replaceChildren(el("h2", "", "About AgentSitcom"));
     this.infoBody.append(
       el(
         "p",
         "about",
-        "TokenValley is a low-poly valley of AI companies. Each building is a company staffed by Claude Code agents that build a project in a folder on your machine, while a cartoon office shows them walking between desks, calling meetings, and arguing in speech bubbles. You are the founder: you found companies, hand each one a brief, watch, and approve or reject at gates. It runs on your own Claude Code subscription; the client only renders what the server's events say.",
+        "AgentSitcom is a low-poly valley of AI companies. Each building is a company staffed by Claude Code agents that build a project in a folder on your machine, while a cartoon office shows them walking between desks, calling meetings, and arguing in speech bubbles. You are the founder: you found companies, hand each one a brief, watch, and approve or reject at gates. It runs on your own Claude Code subscription; the client only renders what the server's events say.",
       ),
     );
     const repo = el("p", "about muted");
-    repo.append("Source: ", el("code", "", "github.com/Surya5599/TokenValley"), " (this client lives in ", el("code", "", "apps/client"), ")");
+    repo.append("Source: ", el("code", "", "github.com/Surya5599/AgentSitcom"), " (this client lives in ", el("code", "", "apps/client"), ")");
     this.infoBody.append(repo);
     this.infoBackdrop.classList.add("open");
     this.infoBackdrop.querySelector<HTMLButtonElement>("button")?.focus();

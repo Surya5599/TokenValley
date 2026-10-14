@@ -4,7 +4,7 @@ import type {
   Event,
   ServerMessage,
   Task,
-} from "@tokenvalley/shared";
+} from "@agentsitcom/shared";
 
 /**
  * In-memory town state. Phase 2 moves company state into one SQLite file per
@@ -16,7 +16,7 @@ export class Town {
   readonly tasks = new Map<string, Task>();
   readonly events: Event[] = [];
   focusedCompanyId: string | null = null;
-  poolSize = Number(process.env.TOKENVALLEY_POOL ?? 2);
+  poolSize = Number(process.env.AGENTSITCOM_POOL ?? 2);
   private liveSlots = 0;
 
   liveSlotsFree(): number {

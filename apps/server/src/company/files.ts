@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, watch, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { FoundCompanyInput, ModelTier, type Company } from "@tokenvalley/shared";
+import { FoundCompanyInput, ModelTier, type Company } from "@agentsitcom/shared";
 import { REPO_ROOT } from "../roles.js";
 
 /**
@@ -79,7 +79,7 @@ export function listCompanyFiles(): CompanyFile[] {
     try {
       out.push(readCompanyFile(file));
     } catch (err) {
-      console.error(`[tokenvalley] could not read ${file}:`, err instanceof Error ? err.message : err);
+      console.error(`[agentsitcom] could not read ${file}:`, err instanceof Error ? err.message : err);
     }
   }
   return out;

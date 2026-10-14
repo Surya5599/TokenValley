@@ -1,4 +1,4 @@
-import { ROLE_LABEL, type Agent } from "@tokenvalley/shared";
+import { ROLE_LABEL, type Agent } from "@agentsitcom/shared";
 
 /**
  * The story's DOM: cold-open title card, end card, and the lower-third name
@@ -116,9 +116,9 @@ export class StoryCards {
     this.captionUntil = this.time + seconds;
   }
 
-  /** The cold-open card: dark, "TokenValley" small, the episode title large, the tagline, a subtle wordmark. */
+  /** The cold-open card: dark, "AgentSitcom" small, the episode title large, the tagline, a subtle wordmark. */
   showTitle(title: string, tagline: string): void {
-    this.title.replaceChildren(el("div", "small", "TokenValley"), el("div", "big", title), el("div", "tag", tagline), el("div", "mark", "TokenValley"));
+    this.title.replaceChildren(el("div", "small", "AgentSitcom"), el("div", "big", title), el("div", "tag", tagline), el("div", "mark", "AgentSitcom"));
     this.title.classList.add("in");
   }
 
@@ -127,7 +127,7 @@ export class StoryCards {
   }
 
   showEnd(title: string): void {
-    this.end.replaceChildren(el("div", "small", "TokenValley"), el("div", "big", title), el("div", "tag", "Dunder Mindflin · Limitless paper in a paperless world."));
+    this.end.replaceChildren(el("div", "small", "AgentSitcom"), el("div", "big", title), el("div", "tag", "Dunder Mindflin · Limitless paper in a paperless world."));
     this.end.classList.add("in");
   }
 

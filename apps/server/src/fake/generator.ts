@@ -8,7 +8,7 @@ import {
   type RoleId,
   type Spend,
   type Task,
-} from "@tokenvalley/shared";
+} from "@agentsitcom/shared";
 import type { Town } from "../town.js";
 
 /**

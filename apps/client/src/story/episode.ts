@@ -1,5 +1,5 @@
 import type * as THREE from "three";
-import type { Agent, AnimState, Approval, Event, RoleId, Task } from "@tokenvalley/shared";
+import type { Agent, AnimState, Approval, Event, RoleId, Task } from "@agentsitcom/shared";
 import type { AudioEngine, SfxName, SfxParams } from "../audio/engine";
 import type { CameraMode, Store } from "../state/store";
 import type { Overlay } from "../ui/overlay";
@@ -19,7 +19,7 @@ export interface StoryHost {
   valley: Valley;
   overlayRoot: HTMLElement;
   audio: AudioEngine;
-  handleMessage: (m: import("@tokenvalley/shared").ServerMessage) => void;
+  handleMessage: (m: import("@agentsitcom/shared").ServerMessage) => void;
   setCamera: (mode: CameraMode) => void;
   /** Post-processing look and lens for a camera mode, without moving the camera (snap zooms, talking heads). */
   setLook: (mode: CameraMode) => void;

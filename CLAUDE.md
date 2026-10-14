@@ -1,4 +1,4 @@
-# TokenValley
+# AgentSitcom
 
 pnpm monorepo. Read `docs/PLAN.md` before changing architecture; it is the
 source of truth for phases, gates, and the event vocabulary.

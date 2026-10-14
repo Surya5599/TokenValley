@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { HOME_SPOTS, OFFICE_DEPTH, OFFICE_ROOMS, OFFICE_WIDTH, type Palette, type Room } from "@tokenvalley/shared";
+import { HOME_SPOTS, OFFICE_DEPTH, OFFICE_ROOMS, OFFICE_WIDTH, type Palette, type Room } from "@agentsitcom/shared";
 import { isWalkable, reachableFrom, type ObstacleGrid, type Tile } from "./pathfinding";
 import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeometry.js";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
@@ -942,7 +942,7 @@ export class Office {
     ctx.font = "bold 48px system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText(this.companyName || "TokenValley", canvas.width / 2, canvas.height / 2, canvas.width - 40);
+    ctx.fillText(this.companyName || "AgentSitcom", canvas.width / 2, canvas.height / 2, canvas.width - 40);
     const tex = canvasTexture(canvas);
     const mat = new THREE.MeshBasicMaterial({ map: tex });
     this.materials.push(mat);

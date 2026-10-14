@@ -4,7 +4,7 @@
     {
       "name": "client",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["--filter", "@tokenvalley/client", "dev"],
+      "runtimeArgs": ["--filter", "@agentsitcom/client", "dev"],
       "port": 5173
     }
   ]

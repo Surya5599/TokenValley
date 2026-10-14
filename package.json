@@ -1,5 +1,5 @@
 {
-  "name": "tokenvalley",
+  "name": "agentsitcom",
   "private": true,
   "version": "0.1.0",
   "description": "A low-poly 3D valley of AI companies, staffed by real Claude Code agents, that build your projects while you watch. The Office: Agent Edition.",
@@ -10,11 +10,11 @@
   },
   "scripts": {
     "dev": "pnpm -r --parallel --filter ./apps/* dev",
-    "dev:server": "pnpm --filter @tokenvalley/server dev",
-    "dev:client": "pnpm --filter @tokenvalley/client dev",
+    "dev:server": "pnpm --filter @agentsitcom/server dev",
+    "dev:client": "pnpm --filter @agentsitcom/client dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
-    "spike": "pnpm --filter @tokenvalley/server spike"
+    "spike": "pnpm --filter @agentsitcom/server spike"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

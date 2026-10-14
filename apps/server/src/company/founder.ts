@@ -8,7 +8,7 @@ import {
   type Company,
   type FoundCompanyInput,
   type ModelTier,
-} from "@tokenvalley/shared";
+} from "@agentsitcom/shared";
 import type { Town } from "../town.js";
 import { loadRole, loadRoster } from "../roles.js";
 import type { CompanyRegistry, CompanyRecord } from "./registry.js";
@@ -45,10 +45,10 @@ function prepareWorkspaceBranch(workspacePath: string, slug: string): void {
       git("init", "-q");
       git("add", "-A");
       try {
-        git("-c", "user.name=TokenValley", "-c", "user.email=tokenvalley@localhost", "commit", "-q", "-m", "Initial state before TokenValley", "--allow-empty");
+        git("-c", "user.name=AgentSitcom", "-c", "user.email=agentsitcom@localhost", "commit", "-q", "-m", "Initial state before AgentSitcom", "--allow-empty");
       } catch { /* nothing to commit */ }
     }
-    const branch = `tokenvalley/${slug}`;
+    const branch = `agentsitcom/${slug}`;
     const current = git("rev-parse", "--abbrev-ref", "HEAD");
     if (current !== branch) {
       try {
@@ -58,7 +58,7 @@ function prepareWorkspaceBranch(workspacePath: string, slug: string): void {
       }
     }
   } catch (err) {
-    console.warn(`[tokenvalley] could not prepare a git branch in ${workspacePath}:`, err instanceof Error ? err.message : err);
+    console.warn(`[agentsitcom] could not prepare a git branch in ${workspacePath}:`, err instanceof Error ? err.message : err);
   }
 }
 

@@ -3,7 +3,7 @@ role: it
 kind: hire
 model: sonnet
 effort: medium
-tools: [mcp__tokenvalley__send_message, mcp__tokenvalley__post, mcp__tokenvalley__update_task, mcp__tokenvalley__handoff, Read, Edit, Write, Glob, Grep, Bash]
+tools: [mcp__agentsitcom__send_message, mcp__agentsitcom__post, mcp__agentsitcom__update_task, mcp__agentsitcom__handoff, Read, Edit, Write, Glob, Grep, Bash]
 home: server_closet
 ---
 

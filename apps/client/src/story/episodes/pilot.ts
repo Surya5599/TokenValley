@@ -59,12 +59,12 @@ export const pilot: Episode = {
       { at: 15, run: () => overview(5) },
       { at: 15.5, run: () => send(post(cast.erin, "general", "Welcome to Dunder Mindflin!")) },
       // 20-32s: the founder's brief; Michael answers at the bell.
-      { at: 20, run: () => send(dm(FOUNDER_ID, cast.michael.id, "Michael, build us a landing page for TokenValley: pastel, three feature cards, works on a phone.")) },
+      { at: 20, run: () => send(dm(FOUNDER_ID, cast.michael.id, "Michael, build us a landing page for AgentSitcom: pastel, three feature cards, works on a phone.")) },
       { at: 22, run: () => follow(cast.michael, 1.8) },
       { at: 23.5, run: () => send(dm(cast.michael.id, FOUNDER_ID, "Founder, say no more. Synergy time.")) },
       // 32-55s: the goal list, tasks on the board, Jim hands out work, desks get busy.
       { at: 31.5, run: () => overview(2.5) },
-      { at: 32, run: () => send(post(cast.michael, "general", "Goal: a TokenValley landing page. Pastel. Three feature cards. Works on a phone. This is our moon landing.")) },
+      { at: 32, run: () => send(post(cast.michael, "general", "Goal: a AgentSitcom landing page. Pastel. Three feature cards. Works on a phone. This is our moon landing.")) },
       { at: 34, run: () => send({ ...base(), type: "task_created", task: tTokens }) },
       { at: 35, run: () => send({ ...base(), type: "task_created", task: tHtml }) },
       { at: 36, run: () => send({ ...base(), type: "task_created", task: tCss }) },
